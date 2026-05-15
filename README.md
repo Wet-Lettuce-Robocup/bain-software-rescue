@@ -1,3 +1,3 @@
 # bain-software-rescue
 
-cmon
+All documentation will be completed on the 'obsidian' branch.
