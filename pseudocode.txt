@@ -1,0 +1,25 @@
+rescue entry (a silver strip):
+    check for ultrabright spots
+
+straighten to silver strip so strip is horizontal
+move forward to enter
+while turning on the spot slowly
+    sample distance sensor 
+    scan for red and green triangles
+map area with distance sensor data and location of red and green triangles in SLAM
+while turning on the spot again
+    search for alive victims (silver reflective ball)
+    stop once finding one 
+go grab the alive victim, pickup and store
+while turning on the spot again
+    search for alive victims (silver reflective ball)
+    stop once finding one 
+go grab second alive victim, pickup and store
+while turning on the spot again
+    search for dead victim (matt black ball)
+    stop once finding one
+go grab the dead victim, hold with claw
+go to green triangle
+empty stored alive victims
+go to red triangle
+empty stored dead victim

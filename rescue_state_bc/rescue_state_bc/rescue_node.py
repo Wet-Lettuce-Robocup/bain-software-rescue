@@ -17,6 +17,8 @@ class Rescue(LifecycleNode):
     def on_activate(self, state):
         self.get_logger().info('Activating...')
         # enable publishers and timers
+        #timer
+        self.create_timer()
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state):
@@ -38,3 +40,6 @@ class Rescue(LifecycleNode):
         self.get_logger().error('Error state entered')
         # error state
         return TransitionCallbackReturn.SUCCESS
+
+    def align_silver(self):
+        pass
