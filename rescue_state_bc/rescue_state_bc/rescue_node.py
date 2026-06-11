@@ -5,7 +5,7 @@ from rclpy.lifecycle import TransitionCallbackReturn
 from lifecycle_msgs.msg import Transition
 from enum import Enum, auto
 from robot_msgs.msg import Detections
-from std_msgs.msg import Int32
+from std_msgs.msg import Int32, Bool
 from rclpy.action import ActionClient
 from robot_msgs.action import Move
 from math import pi
@@ -19,6 +19,7 @@ class State(Enum):
 
 class Movement():
     def __init__(self, node):
+        self.node = node
         # setup action clients
         self.move_client = ActionClient(
             node,
@@ -47,29 +48,30 @@ class Movement():
         goal_handle = future.result()
 
         if not goal_handle.accepted: # if goal is rejected, log error and set busy to false
-            self.get_logger().error('Movement Goal rejected')
+            self.node.get_logger().error('Movement Goal rejected')
             self.busy = False
             return
 
-        self.get_logger().info('Movement Goal accepted')
+        self.node.get_logger().info('Movement Goal accepted')
 
         self.get_result_future = goal_handle.get_result_async() # 
         self.get_result_future.add_done_callback( 
-            self.get_result_callback
+            self.result_callback
         )
 
     def result_callback(self, future):
         result = future.result().result
 
         if result.success:
-            self.get_logger().info('Movement Goal success')
+            self.node.get_logger().info('Movement Goal success')
         else:
-            self.get_logger().error('Movement Goal fail')
+            self.node.get_logger().error('Movement Goal fail')
 
         self.busy = False
 class Rescue(LifecycleNode):
     def __init__(self):
         super().__init__('rescue_node')
+        self.state = State.ENTER
 
     def on_configure(self):
         self.get_logger().info('Configuring Rescue Node...')
@@ -90,16 +92,35 @@ class Rescue(LifecycleNode):
         )
 
         # setup publishers
-        self.fan_pub = self.create_publisher(Int32, '/fan_speed', 10)
-        self.claw_pub = self.create_publisher(Int32, '/claw_command', 10)
-        self.drive_pub = self.create_publisher(Int32, '??', 10)
+        self.front_vision_enable_pub = self.create_publisher(
+            Bool,
+            '/front_vision_enable',
+            10
+        )
+        self.fan_pub = self.create_publisher(
+            Int32,
+            '/fan_speed',
+            10
+        )
+        self.claw_pub = self.create_publisher(
+            Int32,
+            '/claw_command',
+            10
+        )
+        self.drive_pub = self.create_publisher(
+            Int32,
+            '??',
+            10
+        )
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self):
         self.get_logger().info('Activating...')
-        # enable publishers and timers
+
+        self.front_vision_enable_pub.publish(True)
         self.create_timer(0.01, self.rescue_control_loop)
+
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self):
@@ -120,7 +141,6 @@ class Rescue(LifecycleNode):
         elif self.state == State.SEARCH:
             self.get_logger().info('Searching for victims and ball trays')
             self.get_logger().info('Starting front vision node')
-            self.vision_enabled = True
             self.move.drive(0, )
             self.state = State.APPROACH
 

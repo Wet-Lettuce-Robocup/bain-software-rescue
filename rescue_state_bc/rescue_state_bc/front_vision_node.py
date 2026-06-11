@@ -1,13 +1,15 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from robot_msgs.msg import Detection
+from std_msgs.msg import Bool
+from robot_msgs.msg import Detections as DetectionsMsg
 import cv2 as cv
 import numpy as np
+from enum import Enum
 
 # LATER: try adaptive thresholding
 
-class Detections(Enum):
+class DetectionTypes(Enum):
     G_TRAY = 0
     R_TRAY = 1
     S_VICTIM = 2
@@ -30,21 +32,34 @@ class FrontVisionNode(Node):
 
     def __init__(self):
         super().__init__('vision')
-        self.msg = Detection()
+        self.msg = DetectionsMsg()
 
         # subscriptions
         self.camera_sub = self.create_subscription(
             Image,
             self.get_parameter('camera_topic').get_parameter_value().string_value,
-            self.process_image,
+            self.image_callback,
+            10
+        )
+        self.enable_sub = self.create_subscription(
+            Bool,
+            '/front_vision_enable',
+            self.enable_callback,
             10
         )
         # publishers
-        self.scan_pub = self.create_publisher(
-            Detections,
+        self.detection_pub = self.create_publisher(
+            DetectionsMsg,
             '/scan_detections',
             10
         )
+
+    def enable_callback(self, msg):
+        self.vision_enabled = msg.data
+        if self.vision_enabled:
+            self.get_logger().info('Front vision enabled')
+        else:
+            self.get_logger().info('Front vision disabled')
 
     def image_callback(self, msg):
         if not self.vision_enabled:
@@ -72,16 +87,17 @@ class FrontVisionNode(Node):
             if cv.contourArea(contour) > self.min_tray_size:
                 # find the center of mass of the contour
                 M = cv.moments(contour)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                # check if the COM is near middle
-                if cX < ((self.frame_width/2)+10) and cX > ((self.frame_width/2)-10):                 
-                    self.msg.type = Detection.G_TRAY
-                    self.msg.visible = True
-                    self.msg.bearing = 0
-                    self.msg.distance = None
-                    self.detection_pub.publish(self.msg)
-                    self.logger.info('Green tray detected')
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    # check if the COM is near middle
+                    if cX < ((self.frame_width/2)+10) and cX > ((self.frame_width/2)-10):                 
+                        self.msg.type = DetectionTypes.G_TRAY.value
+                        self.msg.visible = True
+                        self.msg.bearing = 0.0
+                        self.msg.distance = 0.0
+                        self.detection_pub.publish(self.msg)
+                        self.get_logger().info('Green tray detected')
 
     def detect_red_tray(self, image):
         # convert to hsv color space
@@ -93,16 +109,17 @@ class FrontVisionNode(Node):
             if cv.contourArea(contour) > self.min_tray_size:
                 # find the center of mass of the contour
                 M = cv.moments(contour)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                # check if the COM is near middle
-                if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
-                    self.msg.type = Detection.R_TRAY
-                    self.msg.visible = True
-                    self.msg.bearing = 0
-                    self.msg.distance = None
-                    self.detection_pub.publish(self.msg)
-                    self.logger.info('Red tray detected')
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    # check if the COM is near middle
+                    if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
+                        self.msg.type = DetectionTypes.R_TRAY.value
+                        self.msg.visible = True
+                        self.msg.bearing = 0.0
+                        self.msg.distance = 0.0
+                        self.detection_pub.publish(self.msg)
+                        self.get_logger().info('Red tray detected')
 
     def detect_silver_victims(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
@@ -112,19 +129,20 @@ class FrontVisionNode(Node):
             if cv.contourArea(contour) > self.min_silver_ball_size:
                 # find the center of mass of the contour
                 M = cv.moments(contour)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
-                    self.msg.type = Detection.S_VICTIM
-                    self.msg.visible = True
-                    self.msg.bearing = 0
-                    self.msg.distance = None
-                    self.detection_pub.publish(self.msg)
-                    self.logger.info('Silver victim detected')
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
+                        self.msg.type = DetectionTypes.S_VICTIM.value
+                        self.msg.visible = True
+                        self.msg.bearing = 0.0
+                        self.msg.distance = 0.0
+                        self.detection_pub.publish(self.msg)
+                        self.get_logger().info('Silver victim detected')
 
     def detect_black_victims(self, image):
         # convert to hsv
-        image = cv.gaussianBlur(image, (5, 5), 0)
+        image = cv.GaussianBlur(image, (5, 5), 0)
         image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
         image = cv.inRange(image, self.black_hsv_min, self.black_hsv_max) # really dark spots
         image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
@@ -134,11 +152,13 @@ class FrontVisionNode(Node):
             if cv.contourArea(contour) > self.min_black_ball_size:
                 # find the center of mass of the contour
                 M = cv.moments(contour)
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
-                    self.msg.type = Detection.B_VICTIM
-                    self.msg.visible = True
-                    self.msg.bearing = 0
-                    self.msg.distance = None
-                    self.detection_pub.publish(self.msg)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    if cX < ((self.frame_width/2)+self.center_thres) and cX > ((self.frame_width/2)-self.center_thres):
+                        self.msg.type = DetectionTypes.B_VICTIM.value
+                        self.msg.visible = True
+                        self.msg.bearing = 0.0
+                        self.msg.distance = 0.0
+                        self.detection_pub.publish(self.msg)
+                        self.get_logger().info('Black victim detected')
