@@ -4,18 +4,17 @@ from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from lifecycle_msgs.msg import Transition
 from enum import Enum, auto
-from robot_msgs.msg import CameraDetections
+from robot_msgs.msg import Detections
 from std_msgs.msg import Int32
 from rclpy.action import ActionClient
 from robot_msgs.action import Move
 
-
 class State(Enum):
-    ENTER = auto() # initial state when the robot enters the rescue area
-    SEARCH = auto() # searching for the victims and ball trays
-    APPROACH = auto() # approaching the victim and storing
-    RESCUE = auto() # releasing victims into trays
-    EXIT = auto() # exiting the rescue area after rescuing the victims
+    ENTER = 0 # initial state when the robot enters the rescue area
+    SEARCH = 1 # searching for the victims and ball trays
+    APPROACH = 2 # approaching the victim and storing
+    RESCUE = 3 # releasing victims into trays
+    EXIT = 4 # exiting the rescue area after rescuing the victims
 
 class Movement():
     def __init__(self, node):
@@ -33,6 +32,8 @@ class Movement():
         goal.angle = angle
         goal.vel = velocity
 
+        self.busy = True
+
         self.move_client.wait_for_server()
 
         self.send_goal_future = self.move_client.send_goal_async(goal)
@@ -41,6 +42,30 @@ class Movement():
             self.goal_response_callback
         )
 
+    def goal_response_callback(self, future):
+        goal_handle = future.result()
+
+        if not goal_handle.accepted: # if goal is rejected, log error and set busy to false
+            self.get_logger().error('Movement Goal rejected')
+            self.busy = False
+            return
+
+        self.get_logger().info('Movement Goal accepted')
+
+        self.get_result_future = goal_handle.get_result_async() # 
+        self.get_result_future.add_done_callback( 
+            self.get_result_callback
+        )
+
+    def result_callback(self, future):
+        result = future.result().result
+
+        if result.success:
+            self.get_logger().info('Movement Goal success')
+        else:
+            self.get_logger().error('Movement Goal fail')
+
+        self.busy = False
 class Rescue(LifecycleNode):
     def __init__(self):
         super().__init__('rescue_node')
@@ -50,7 +75,7 @@ class Rescue(LifecycleNode):
         self.move = Movement(self)
         # setup subscriptions
         self.camera_detection_subscriber = self.create_subscription(
-            CameraDetections,
+            Detections,
             '/scan_detections',
             self.detection_callback,
             10
@@ -58,7 +83,7 @@ class Rescue(LifecycleNode):
 
         self.tof_subscriber = self.create_subscription(
             Int32,
-            '/scan',
+            '/tof_front',
             self.laser_scan_callback,
             10
         )
@@ -86,8 +111,9 @@ class Rescue(LifecycleNode):
         if self.state == State.ENTER:
             self.get_logger().info('Entering rescue area')
             # logic for entering the rescue area
-            #publush drive command to enter the rescue area
-
+            # drive forward test
+            self.move.drive(1.0, 0, 0.1)
+            
             self.state = State.SEARCH
 
         elif self.state == State.SEARCH:
