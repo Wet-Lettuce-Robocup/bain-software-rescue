@@ -8,6 +8,7 @@ from robot_msgs.msg import Detections
 from std_msgs.msg import Int32
 from rclpy.action import ActionClient
 from robot_msgs.action import Move
+from math import pi
 
 class State(Enum):
     ENTER = 0 # initial state when the robot enters the rescue area
@@ -113,12 +114,14 @@ class Rescue(LifecycleNode):
             # logic for entering the rescue area
             # drive forward test
             self.move.drive(1.0, 0, 0.1)
-            
+
             self.state = State.SEARCH
 
         elif self.state == State.SEARCH:
             self.get_logger().info('Searching for victims and ball trays')
-            # logic for searching for victims and ball trays
+            self.get_logger().info('Starting front vision node')
+            self.vision_enabled = True
+            self.move.drive(0, )
             self.state = State.APPROACH
 
         elif self.state == State.APPROACH:
