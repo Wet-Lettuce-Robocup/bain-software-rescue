@@ -10,6 +10,7 @@ from sensor_msgs.msg import LaserScan
 from rclpy.action import ActionClient
 from robot_msgs.action import Move
 import math
+import matplotlib.pyplot as plt
 
 class State(Enum):
     ENTER = auto()        # initial state when the robot enters the rescue area
@@ -248,6 +249,29 @@ class Rescue(LifecycleNode):
 
         # clear collected samples
         self.dist_scan_samples = []
+
+    def analyse_scan(self):
+        # converts the polar samples to cartesian coords
+        for sample in self.dist_scan_samples:
+            x = sample['distance'] * math.cos(sample['angle'])
+            y = sample['distance'] * math.sin(sample['angle'])
+            sample['angle']
+            self.scan_points.append({
+                'x': x,
+                'y': y
+            })
+        
+    def draw_map(self):
+        # draws a map and saves an image (for debugging)
+        x = [p['x'] for p in self.scan_points]
+        y = [p['y'] for p in self.scan_points]
+        plt.scatter(x, y)
+        plt.xlabel('X (m)')
+        plt.ylabel('Y (m)')
+        plt.title('Scan Map')
+        plt.axis('equal')
+        plt.savefig('scan_map.png')
+        self.get_logger().info('Saved scan map to scan_map.png')
             
     def rescue_control_loop(self):
         if self.state == State.ENTER:
@@ -307,7 +331,7 @@ class Rescue(LifecycleNode):
             # if rotation finished, publish and move on
             if getattr(self.move, 'busy', False) == False:
                 self.get_logger().info('Completed mapping rotation; publishing scan')
-                self.publish_scan()
+                self.analyse_scan()
                 self.state = State.APPROACH
 
 
