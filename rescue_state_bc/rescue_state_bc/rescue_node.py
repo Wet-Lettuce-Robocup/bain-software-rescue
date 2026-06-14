@@ -4,18 +4,23 @@ from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from lifecycle_msgs.msg import Transition
 from enum import Enum, auto
-from robot_msgs.msg import Detections, scan_data
+from robot_msgs.msg import Detections
 from std_msgs.msg import Int32, Bool
+from sensor_msgs.msg import LaserScan
 from rclpy.action import ActionClient
 from robot_msgs.action import Move
 import math
 
 class State(Enum):
-    ENTER = 0 # initial state when the robot enters the rescue area
-    SEARCH = 1 # searching for the victims and ball trays
-    APPROACH = 2 # approaching the victim and storing
-    RESCUE = 3 # releasing victims into trays
-    EXIT = 4 # exiting the rescue area after rescuing the victims
+    ENTER = auto()        # initial state when the robot enters the rescue area
+    START_SEARCH = auto() # start searching (kick off rotation / vision)
+    SEARCH = auto()       # searching for the victims and ball trays
+    START_MAP = auto()    # prepare to map (clear samples, start rotation)
+    MAP = auto()          # mapping with distance sensor
+    LOCALISE = auto()     # localise
+    APPROACH = auto()     # approaching the victim and storing
+    RESCUE = auto()       # releasing victims into trays
+    EXIT = auto()         # exiting the rescue area after rescuing the victims
 
 class Movement():
     def __init__(self, node):
@@ -26,6 +31,11 @@ class Movement():
             Move,
             "move"
         )
+        # runtime state
+        self.busy = False
+        self.current_angle = 0.0
+        self.distance_travelled = 0.0
+        self.angle_turned = 0.0
 
     def drive(self, distance, angle=0, velocity=0.1):
         goal = Move.Goal()
@@ -47,8 +57,9 @@ class Movement():
     def feedback_callback(self, feedback_msg):
         feedback = feedback_msg.feedback
 
-        self.distance_travelled = feedback.distance_travelled 
-        self.angle_turned = feedback.angle_turned
+        # update movement feedback when available
+        self.distance_travelled = getattr(feedback, 'distance_travelled', self.distance_travelled)
+        self.angle_turned = getattr(feedback, 'angle_turned', self.angle_turned)
 
     def goal_response_callback(self, future):
         goal_handle = future.result()
@@ -84,6 +95,18 @@ class Rescue(LifecycleNode):
     def __init__(self):
         super().__init__('rescue_node')
         self.state = State.ENTER
+        # control timer handle
+        self.control_timer = None
+        # sensor offset (m): sensor is 100 mm in front of pivot
+        self.sensor_offset = 0.1
+        # last sample angle used to avoid duplicate samples
+        self._last_sample_angle = None
+        # latest tof distance in meters
+        self.tof_distance = float('inf')
+        # ensure Movement will be created in configure
+        self.move = None
+        # storage for scan samples collected during mapping
+        self.dist_scan_samples = []
 
     def on_configure(self):
         self.get_logger().info('Configuring Rescue Node...')
@@ -120,12 +143,12 @@ class Rescue(LifecycleNode):
         )
         self.drive_pub = self.create_publisher(
             Int32,
-            '??',
+            '/drive_command',
             10
         )
         self.scan_pub = self.create_publisher(
-            scan_data,
-            '/scan'
+            LaserScan,
+            '/scan',
             10
         )
 
@@ -133,49 +156,99 @@ class Rescue(LifecycleNode):
 
     def on_activate(self):
         self.get_logger().info('Activating...')
-
-        self.create_timer(0.01, self.rescue_control_loop)
+        self.control_timer = self.create_timer(0.01, self.rescue_control_loop)
 
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self):
         self.get_logger().info('Deactivating...')
         # stop timers
-        self.destroy_timer(self.rescue_control_loop)
+        if self.control_timer is not None:
+            try:
+                self.destroy_timer(self.control_timer)
+            except Exception:
+                pass
+            self.control_timer = None
         return TransitionCallbackReturn.SUCCESS
     
     def detection_callback(self, msg):
-        self.get_logger().info(f'Detection callback: {msg}')
-        # append
+        # record detections from camera with absolute bearing (robot frame)
+        try:
+            bearing = float(msg.bearing) + float(self.move.current_angle)
+        except Exception:
+            bearing = float(getattr(msg, 'bearing', 0.0)) + getattr(self.move, 'current_angle', 0.0)
 
-        bearing = msg.bearing + self.move.angle_turned
+        self.get_logger().debug(f'Detection callback bearing={bearing}')
 
-        self.detected_objects.append(
-            {
-                'type': msg.type,
-                'visible': msg.visible,
-                'bearing': bearing,
-                'distance': msg.distance
-            }
-        )
+        self.detected_objects.append({
+            'type': getattr(msg, 'type', None),
+            'visible': getattr(msg, 'visible', True),
+            'bearing': bearing,
+            'distance': getattr(msg, 'distance', 0.0)
+        })
 
     def laser_scan_callback(self, msg):
-        self.tof_distance = msg.data
+        # tof publishes an integer (mm) — convert to meters
+        try:
+            self.tof_distance = float(msg.data) / 1000.0
+        except Exception:
+            self.tof_distance = float(getattr(msg, 'data', float('inf')))
 
     def face_bearing(self, bearing: float, rotate_vel=0.1):
         current = self.move.current_angle
-        # normalize difference to [-180, 180] so it doesnt rotate the long way around
-        diff = (bearing - current + math.pi) % (2*math.pi) - math.pi
+        # normalize difference to [-pi, pi]
+        diff = (bearing - current + math.pi) % (2 * math.pi) - math.pi
         self.move.drive(0, diff, rotate_vel)
-        self.move.current_angle += diff
+        # optimistic update of angle while action runs
+        self.move.current_angle = (self.move.current_angle + diff) % (2 * math.pi)
 
-    def rotate(self, angle: float, rotate_vel=0.1):
-        self.move.drive(0, angle, rotate_vel)
-        self.move.current_angle += angle
+    def rotate(self, distance: float, angle: float, rotate_vel=0.1):
+        # wrapper to issue rotate (keeps existing call signatures in code)
+        self.move.drive(distance, angle, rotate_vel)
+        # optimistic update
+        self.move.current_angle = (self.move.current_angle + angle) % (2 * math.pi)
 
     def publish_scan(self):
+        scan = LaserScan()
 
-        
+        if len(self.dist_scan_samples) < 3:
+            self.get_logger().warn('Not enough scan samples to publish')
+            return
+
+        scan.header.frame_id = "base_link"
+        scan.header.stamp = self.get_clock().now().to_msg()
+
+        # data entries: list of {'angle': <rad>, 'distance': <m>}
+        data = sorted(self.dist_scan_samples, key=lambda x: x['angle'])
+
+        scan.angle_min = float(data[0]['angle'])
+        scan.angle_max = float(data[-1]['angle'])
+
+        n = len(data)
+        scan.angle_increment = (scan.angle_max - scan.angle_min) / max(n - 1, 1)
+
+        # convert sensor readings (from sensor origin) to ranges relative to base_link (pivot)
+        ranges = []
+        for entry in data:
+            d = float(entry['distance'])
+            if math.isfinite(d) and d > 0.0:
+                # add the forward offset of the sensor
+                r = d + self.sensor_offset
+            else:
+                r = float('inf')
+            ranges.append(r)
+
+        scan.ranges = ranges
+        # optional metadata
+        scan.range_min = 0.02
+        scan.range_max = 30.0
+
+        self.scan_pub.publish(scan)
+        self.get_logger().info(f'Published scan with {n} samples')
+
+        # clear collected samples
+        self.dist_scan_samples = []
+            
     def rescue_control_loop(self):
         if self.state == State.ENTER:
             self.get_logger().info('Entering rescue area')
@@ -185,7 +258,7 @@ class Rescue(LifecycleNode):
 
             self.rotate(0, -math.pi/2, 1) # rotate left initially
 
-            self.state = State.SEARCH
+            self.state = State.START_SEARCH
 
         elif self.state == State.START_SEARCH:
             self.get_logger().info('Searching for victims and ball trays')
@@ -196,32 +269,46 @@ class Rescue(LifecycleNode):
             self.state = State.SEARCH
         
         elif self.state == State.SEARCH:
-            if self.move.busy == False and len(self.detected_objects) > 2:
-                self.front_vision_enable_pub.publish(False)
+            # wait for sweep to finish, or if detections found
+            if getattr(self.move, 'busy', False) == False and len(self.detected_objects) > 0:
+                self.front_vision_enable_pub.publish(Bool(data=False))
                 self.get_logger().info(f'Detected objects: {self.detected_objects}')
                 self.rotate(0, -math.pi/2, 1) # rotate back to original orientation
                 self.state = State.MAP
 
         elif self.state == State.START_MAP:
             self.get_logger().info('Mapping with distance sensor')
-            # current point (how it entered) is (0,0) and angle is 0
-            print(f"current angle: {self.move.current_angle} at position {self.robot_position} (should be 0 and (0,0))")
-            self.rotate(0, 2*math.pi, 0.1) 
-
+            # clear previous samples and start a full rotation to map surroundings
+            self.dist_scan_samples = []
+            self._last_sample_angle = None
+            self.rotate(0, 2 * math.pi, 0.1)
             self.state = State.MAP
 
         elif self.state == State.MAP:
-            if self.move.busy == False:
+            # while rotating, sample TOF and record (angle, distance)
+            try:
+                angle = float(self.move.current_angle)
+            except Exception:
+                angle = float(getattr(self.move, 'current_angle', 0.0))
+
+            do_append = False
+            if self._last_sample_angle is None:
+                do_append = True
+            elif abs(angle - self._last_sample_angle) > 0.01:
+                do_append = True
+
+            if do_append:
+                self.dist_scan_samples.append({
+                    'angle': angle,
+                    'distance': float(self.tof_distance)
+                })
+                self._last_sample_angle = angle
+
+            # if rotation finished, publish and move on
+            if getattr(self.move, 'busy', False) == False:
+                self.get_logger().info('Completed mapping rotation; publishing scan')
                 self.publish_scan()
-                self.APPROACH #when it finishes rotating
-            
-            self.dist_scan_samples.append(
-                {
-                    'angle': self.move.current_angle,
-                    'distance': self.tof_distance
-                }
-            )
-            self.get_logger().info('Mapping victim and ball tray locations')
+                self.state = State.APPROACH
 
 
         elif self.state == State.APPROACH:
