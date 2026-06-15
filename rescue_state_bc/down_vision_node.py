@@ -81,3 +81,13 @@ class DownVisionNode(Node):
         # can use this to align with the strip and follow it
         pass
 
+def main(args=None):
+    rclpy.init(args=args)
+    node = DownVisionNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

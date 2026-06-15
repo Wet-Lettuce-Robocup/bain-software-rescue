@@ -162,3 +162,14 @@ class FrontVisionNode(Node):
                         self.msg.distance = 0.0
                         self.detection_pub.publish(self.msg)
                         self.get_logger().info('Black victim detected')
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = FrontVisionNode()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

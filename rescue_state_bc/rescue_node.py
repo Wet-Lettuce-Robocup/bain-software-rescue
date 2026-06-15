@@ -352,3 +352,14 @@ class Rescue(LifecycleNode):
             # logic for exiting the rescue area after rescuing the victims
 
             self.on_deactivate() # deactivate the node after exiting the rescue area
+
+def main(args=None):
+    rclpy.init(args=args)
+    node = Rescue()
+    rclpy.spin(node)
+    node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()
