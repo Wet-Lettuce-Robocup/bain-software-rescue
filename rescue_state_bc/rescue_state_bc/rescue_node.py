@@ -11,6 +11,7 @@ from rclpy.action import ActionClient
 from robot_msgs.action import Move
 import math
 import matplotlib.pyplot as plt
+import time
 
 class State(Enum):
     ENTER = auto()        # initial state when the robot enters the rescue area
@@ -119,6 +120,12 @@ class Movement():
             self.node.get_logger().info(f'Movement Goal result: {result}')
 
         self.busy = False
+
+    def drive_blocking(self, distance, angle=0, velocity=0.1):
+        # wrapper to issue a drive command and block until it's complete
+        self.drive(distance, angle, velocity)
+        while self.busy:
+            rclpy.spin_once(self.node)
 class Rescue(LifecycleNode):
     detected_objects = []
     dist_scan_samples = []
@@ -311,17 +318,17 @@ class Rescue(LifecycleNode):
             self.get_logger().info('Entering rescue area')
             # logic for entering the rescue area
             # drive forward test
-            self.move.drive(0.5, 0, 0.1) # drive forward a bit to get into the rescue area
-
+            self.move.drive_blocking(0.5, 0, 0.1) # drive forward a bit to get into the rescue area
             self.rotate(0, -math.pi/2, 1) # rotate left initially
-
+            time.sleep(5)
+            self.get_logger().info('Initial rotation complete, starting search')
             self.state = State.START_SEARCH
 
         elif self.state == State.START_SEARCH:
             self.get_logger().info('Searching for victims and ball trays')
 
             # if scan_detections sees something, record the angle turned
-            self.front_vision_enable_pub.publish(True)
+            self.front_vision_enable_pub.publish(Bool(data=True)) # enable front vision to start searching
             self.rotate(0, math.pi, 0.1) # roate slowly to search for objects
             self.state = State.SEARCH
         
