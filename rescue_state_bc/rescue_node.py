@@ -108,7 +108,7 @@ class Rescue(LifecycleNode):
         # storage for scan samples collected during mapping
         self.dist_scan_samples = []
 
-    def on_configure(self):
+    def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
         self.move = Movement(self)
         # setup subscriptions
@@ -154,13 +154,13 @@ class Rescue(LifecycleNode):
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_activate(self):
+    def on_activate(self, state):
         self.get_logger().info('Activating...')
         self.control_timer = self.create_timer(0.01, self.rescue_control_loop)
 
         return TransitionCallbackReturn.SUCCESS
 
-    def on_deactivate(self):
+    def on_deactivate(self, state):
         self.get_logger().info('Deactivating...')
         # stop timers
         if self.control_timer is not None:
