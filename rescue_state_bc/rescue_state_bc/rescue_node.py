@@ -18,6 +18,7 @@ class State(Enum):
     SEARCH = auto()       # searching for the victims and ball trays
     START_MAP = auto()    # prepare to map (clear samples, start rotation)
     MAP = auto()          # mapping with distance sensor
+    LOCALISE = auto()     # localise
     APPROACH = auto()     # approaching the victim and storing
     RESCUE = auto()       # releasing victims into trays
     EXIT = auto()         # exiting the rescue area after rescuing the victims
@@ -46,13 +47,27 @@ class Movement():
 
         self.busy = True
 
-        self.move_client.wait_for_server()
+        # wait for action server to appear (short timeout so we fail fast if it's not available)
+        try:
+            available = self.move_client.wait_for_server(timeout_sec=2.0)
+        except Exception as e:
+            self.node.get_logger().error(f'wait_for_server exception: {e}')
+            self.busy = False
+            return
 
-        self.send_goal_future = self.move_client.send_goal_async(goal)
+        if not available:
+            self.node.get_logger().error('Action server "move" not available (timeout)')
+            self.busy = False
+            return
 
-        self.send_goal_future.add_done_callback(
-            self.goal_response_callback
-        )
+        try:
+            # register feedback callback so we get ongoing updates
+            self.send_goal_future = self.move_client.send_goal_async(goal, feedback_callback=self.feedback_callback)
+            self.send_goal_future.add_done_callback(self.goal_response_callback)
+        except Exception as e:
+            self.node.get_logger().error(f'Failed to send goal: {e}')
+            self.busy = False
+            return
 
     def feedback_callback(self, feedback_msg):
         feedback = feedback_msg.feedback
@@ -62,27 +77,46 @@ class Movement():
         self.angle_turned = getattr(feedback, 'angle_turned', self.angle_turned)
 
     def goal_response_callback(self, future):
-        goal_handle = future.result()
+        try:
+            goal_handle = future.result()
+        except Exception as e:
+            self.node.get_logger().error(f'Goal response future exception: {e}')
+            self.busy = False
+            return
 
-        if not goal_handle.accepted: # if goal is rejected, log error and set busy to false
+        if not getattr(goal_handle, 'accepted', False):
+            # if goal is rejected, log error and set busy to false
             self.node.get_logger().error('Movement Goal rejected')
             self.busy = False
             return
 
         self.node.get_logger().info('Movement Goal accepted')
 
-        self.get_result_future = goal_handle.get_result_async() # 
-        self.get_result_future.add_done_callback( 
-            self.result_callback
-        )
+        try:
+            self.get_result_future = goal_handle.get_result_async()
+            self.get_result_future.add_done_callback(self.result_callback)
+        except Exception as e:
+            self.node.get_logger().error(f'Failed to request result: {e}')
+            self.busy = False
+            return
 
     def result_callback(self, future):
-        result = future.result().result
+        try:
+            res = future.result()
+            result = getattr(res, 'result', res)
+        except Exception as e:
+            self.node.get_logger().error(f'Get result future exception: {e}')
+            self.busy = False
+            return
 
-        if result.success:
+        success = getattr(result, 'success', None)
+        if success is True:
             self.node.get_logger().info('Movement Goal success')
-        else:
+        elif success is False:
             self.node.get_logger().error('Movement Goal fail')
+        else:
+            # unknown result type; log for debugging
+            self.node.get_logger().info(f'Movement Goal result: {result}')
 
         self.busy = False
 class Rescue(LifecycleNode):
@@ -297,7 +331,7 @@ class Rescue(LifecycleNode):
                 self.front_vision_enable_pub.publish(Bool(data=False))
                 self.get_logger().info(f'Detected objects: {self.detected_objects}')
                 self.rotate(0, -math.pi/2, 1) # rotate back to original orientation
-                self.state = State.START_MAP
+                self.state = State.MAP
 
         elif self.state == State.START_MAP:
             self.get_logger().info('Mapping with distance sensor')
@@ -337,12 +371,11 @@ class Rescue(LifecycleNode):
         elif self.state == State.APPROACH:
             self.get_logger().info('Approaching victim and storing')
             # logic for approaching the victim and storing
-            self.state = State.RESCUE
+            self.state = State.LOCALISE
 
         elif self.state == State.RESCUE:
             self.get_logger().info('Rescuing victims into trays')
             # logic for rescuing victims into trays
-            self.state = State.EXIT
 
             self.state = State.EXIT
 
@@ -352,14 +385,3 @@ class Rescue(LifecycleNode):
             # logic for exiting the rescue area after rescuing the victims
 
             self.on_deactivate() # deactivate the node after exiting the rescue area
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = Rescue()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
-
-if __name__ == '__main__':
-    main()
