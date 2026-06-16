@@ -37,6 +37,7 @@ class FrontVisionNode(Node):
         # subscriptions
         self.camera_sub = self.create_subscription(
             Image,
+            self.declare_parameter('camera_topic', '/front_camera/camera_node/image_raw').get_parameter_value().string_value,
             self.get_parameter('camera_topic').get_parameter_value().string_value,
             self.image_callback,
             10

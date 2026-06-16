@@ -17,6 +17,7 @@ def generate_launch_description():
 			package='rescue_state_bc',
 			executable='rescue_node',
 			name='rescue_node',
+			namespace='',
 			output='screen',
 			parameters=[{'use_sim_time': use_sim_time}],
         ),
