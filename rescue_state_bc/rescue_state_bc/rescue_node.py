@@ -121,17 +121,7 @@ class Movement():
 
         self.busy = False
 
-    def drive_blocking(self, distance, angle=0, velocity=0.1):
-        # wrapper to issue a drive command and block until it's complete
-        self.drive(distance, angle, velocity)
-        while self.busy:
-            rclpy.spin_once(self.node)
 
-    def rotate_blocking(self, angle, velocity=0.1):
-        # wrapper to issue a rotate command and block until it's complete
-        self.drive(0, angle, velocity)
-        while self.busy:
-            rclpy.spin_once(self.node)
 class Rescue(LifecycleNode):
     detected_objects = []
     dist_scan_samples = []
