@@ -320,14 +320,15 @@ class Rescue(LifecycleNode):
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
+            self.get_logger().info('Initial drive complete, starting initial rotation')
             if getattr(self.move, 'busy', False) == False:
                 self.rotate(0, -math.pi/2, 1)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
             # wait for the initial rotation to finish, then begin searching
+            self.get_logger().info('Initial rotation complete, starting search')
             if getattr(self.move, 'busy', False) == False:
-                self.get_logger().info('Initial rotation complete, starting search')
                 self.state = State.START_SEARCH
 
         elif self.state == State.START_SEARCH:
