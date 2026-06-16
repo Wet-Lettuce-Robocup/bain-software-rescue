@@ -11,12 +11,12 @@ class DownVisionNode(Node):
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()
-        self.declare_parameter('camera_topic', '/down_camera/camera_node/image_raw').get_parameter_value().string_value,
+        self.declare_parameter('camera_topic', '/down_camera/camera_node/image_raw')
 
         # subscriptions
         self.camera_sub = self.create_subscription(
             Image,
-            self.get_parameter('camera_topic').get_parameter_value().string_value,
+            self.get_parameter('camera_topic').value,
             self.image_callback,
             10
         )
