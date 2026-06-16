@@ -315,14 +315,14 @@ class Rescue(LifecycleNode):
         if self.state == State.ENTER:
             self.get_logger().info('Entering rescue area')
             # start non-blocking drive into the rescue area
-            self.move.drive(0.5, 0, 0.1)
+            self.move.drive(0.25, 0, 0.1)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             self.get_logger().info('Initial drive complete, starting initial rotation')
             if getattr(self.move, 'busy', False) == False:
-                self.rotate(0, -math.pi/2, 1)
+                self.rotate(0, -math.pi/2, 0.1)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
