@@ -4,11 +4,11 @@ from rclpy.lifecycle import LifecycleNode
 from rclpy.lifecycle import TransitionCallbackReturn
 from lifecycle_msgs.msg import Transition
 from enum import Enum, auto
-from robot_msgs.msg import Detections
-from std_msgs.msg import Int32, Bool
+from robot_msgs.msg import Detections, LEDCommand
+from std_msgs.msg import Int32, Bool, ColorRGBA
 from sensor_msgs.msg import LaserScan
 from rclpy.action import ActionClient
-from robot_msgs.action import Move
+from robot_msgs.action import MoveTime
 import math
 import matplotlib.pyplot as plt
 # HI WILL CAN U SEE. THIS
@@ -30,23 +30,48 @@ class Movement():
     def __init__(self, node):
         self.node = node
         # setup action clients
+        # Use the time-based movement action server
         self.move_client = ActionClient(
             node,
-            Move,
-            "move"
+            MoveTime,
+            "move_time"
         )
         # runtime state
         self.busy = False
         self.current_angle = 0.0
         self.distance_travelled = 0.0
         self.angle_turned = 0.0
+        # store last goal velocities so feedback (time) can be mapped to distance/angle
+        self._last_goal_vel = 0.0
+        self._last_goal_angular_vel = 0.0
+        self._last_goal_time = 0.0
 
     def drive(self, distance, angle=0, velocity=0.1):
-        goal = Move.Goal()
+        # compute required times (guard against zero velocity)
+        linear_time = abs(distance) / abs(velocity) if velocity != 0 and distance != 0 else 0.0
+        angular_time = abs(angle) / abs(velocity) if velocity != 0 and angle != 0 else 0.0
 
-        goal.distance = distance
-        goal.angle = angle
-        goal.vel = velocity
+        time_required = max(linear_time, angular_time)
+
+        if time_required <= 0.0:
+            # nothing to do
+            self.node.get_logger().warn('Drive called with zero distance and angle; ignoring')
+            return
+
+        goal = MoveTime.Goal()
+        goal.time = float(time_required)
+
+        # preserve direction using copysign
+        linear_vel = math.copysign(velocity, distance) if distance != 0 else 0.0
+        angular_vel = math.copysign(velocity, angle) if angle != 0 else 0.0
+
+        goal.vel = float(linear_vel)
+        goal.angular_vel = float(angular_vel)
+
+        # remember for feedback mapping
+        self._last_goal_vel = float(linear_vel)
+        self._last_goal_angular_vel = float(angular_vel)
+        self._last_goal_time = float(time_required)
 
         self.busy = True
 
@@ -59,7 +84,7 @@ class Movement():
             return
 
         if not available:
-            self.node.get_logger().error('Action server "move" not available (timeout)')
+            self.node.get_logger().error('Action server "move_time" not available (timeout)')
             self.busy = False
             return
 
@@ -75,9 +100,21 @@ class Movement():
     def feedback_callback(self, feedback_msg):
         feedback = feedback_msg.feedback
 
-        # update movement feedback when available
-        self.distance_travelled = getattr(feedback, 'distance_travelled', self.distance_travelled)
-        self.angle_turned = getattr(feedback, 'angle_turned', self.angle_turned)
+        # New MoveTime feedback exposes elapsed time; map that to distance/angle
+        time_elapsed = getattr(feedback, 'time_elapsed', None)
+        if time_elapsed is not None:
+            # `time_elapsed` may be in seconds or nanoseconds depending on server
+            te = float(time_elapsed)
+            # heuristic: if value is huge, assume nanoseconds and convert to seconds
+            te_sec = te * 1e-9 if te > 1e6 else te
+
+            # map elapsed time to travelled distance and turned angle using last goal velocities
+            self.distance_travelled = self._last_goal_vel * te_sec
+            self.angle_turned = self._last_goal_angular_vel * te_sec
+        else:
+            # fallback to legacy feedback fields if present
+            self.distance_travelled = getattr(feedback, 'distance_travelled', self.distance_travelled)
+            self.angle_turned = getattr(feedback, 'angle_turned', self.angle_turned)
 
     def goal_response_callback(self, future):
         try:
@@ -134,6 +171,7 @@ class Rescue(LifecycleNode):
     def __init__(self):
         super().__init__('rescue_node')
         self.state = State.ENTER
+        self._last_state = None
         # control timer handle
         self.control_timer = None
         # sensor offset (m): sensor is 100 mm in front of pivot
@@ -146,6 +184,9 @@ class Rescue(LifecycleNode):
         self.move = None
         # storage for scan samples collected during mapping
         self.dist_scan_samples = []
+
+        # LED publisher will be created in on_configure
+        self.led_cmd_pub = None
 
     def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
@@ -189,6 +230,13 @@ class Rescue(LifecycleNode):
             LaserScan,
             '/scan',
             10
+        )
+
+        # LED command publisher for first LED (index 0)
+        self.led_cmd_pub = self.create_publisher(
+            LEDCommand,
+            'led_command',
+            10,
         )
 
         return TransitionCallbackReturn.SUCCESS
@@ -311,7 +359,47 @@ class Rescue(LifecycleNode):
         plt.savefig('scan_map.png')
         self.get_logger().info('Saved scan map to scan_map.png')
             
+    def _publish_led_for_state(self, state: State) -> None:
+        """Publish an LEDCommand for the first LED (index 0) based on state."""
+        if self.led_cmd_pub is None:
+            return
+
+        # mapping of states to RGBA colors
+        mapping = {
+            State.ENTER: (0.0, 0.0, 1.0, 1.0),        # blue
+            State.ENTER_DRIVE: (0.0, 1.0, 0.0, 1.0),  # green
+            State.ENTER_ROTATE: (1.0, 1.0, 0.0, 1.0), # yellow
+            State.START_SEARCH: (1.0, 0.0, 1.0, 1.0), # magenta
+            State.SEARCH: (0.0, 1.0, 1.0, 1.0),       # cyan
+            State.START_MAP: (1.0, 0.5, 0.0, 1.0),    # orange
+            State.MAP: (0.5, 0.0, 0.5, 1.0),          # purple
+            State.LOCALISE: (1.0, 1.0, 1.0, 1.0),     # white
+            State.APPROACH: (0.5, 1.0, 0.0, 1.0),     # lime
+            State.RESCUE: (1.0, 0.0, 0.0, 1.0),       # red
+            State.EXIT: (0.0, 0.0, 0.0, 1.0),         # off
+        }
+
+        rgba = mapping.get(state, (0.0, 0.0, 0.0, 1.0))
+
+        cmd = LEDCommand()
+        cmd.index = 0
+        color = ColorRGBA()
+        color.r, color.g, color.b, color.a = rgba
+        cmd.color = color
+
+        try:
+            self.led_cmd_pub.publish(cmd)
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish LEDCommand: {e}')
     def rescue_control_loop(self):
+        # publish LED color on state changes for the first LED
+        if getattr(self, '_last_state', None) != self.state:
+            try:
+                self._publish_led_for_state(self.state)
+            except Exception as e:
+                self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
+            self._last_state = self.state
+
         if self.state == State.ENTER:
             self.get_logger().info('Entering rescue area')
             # start non-blocking drive into the rescue area
