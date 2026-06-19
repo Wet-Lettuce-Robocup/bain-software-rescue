@@ -11,7 +11,6 @@ from rclpy.action import ActionClient
 from robot_msgs.action import MoveTime
 import math
 import matplotlib.pyplot as plt
-# HI WILL CAN U SEE. THIS
 
 class State(Enum):
     ENTER = auto()        # initial state when the robot enters the rescue area
@@ -45,6 +44,10 @@ class Movement():
         self._last_goal_vel = 0.0
         self._last_goal_angular_vel = 0.0
         self._last_goal_time = 0.0
+
+        # sequence state used by run_sequence, _advance_sequence
+        self._sequence = None
+        self._on_complete = None
 
     def drive(self, distance, angle=0, velocity=0.1):
         # compute required times (guard against zero velocity)
@@ -159,6 +162,44 @@ class Movement():
             self.node.get_logger().info(f'Movement Goal result: {result}')
 
         self.busy = False
+
+        # if a sequence is running, advance to its next step once result is received
+        if self._on_complete is not None:
+            self._on_complete()
+
+    def _advance_sequence(self): #underscore since its internal
+        if self._sequence is None: # do not advance if no sequence is running
+            return
+        try:
+            next(self._sequence) # advance to next
+        except StopIteration: # sequence is complete
+            self._sequence = None
+            self._on_complete = None
+
+    def run_sequence(self, sequence_gen):
+        #   def my_sequence(self):
+        #       self.move.drive(0.5, 0, 0.1)
+        #       yield
+        #       self.move.drive(0, math.pi/2, 0.1)
+        #       yield
+        #       if self.tof_distance < 0.2:
+        #           self.move.drive(-0.1, 0, 0.1)
+        #       else:
+        #           self.move.drive(0.3, 0, 0.1)
+        #       yield
+        #       self.state = State.RESCUE
+
+        #   elif self.state == State.START_APPROACH:
+        #       self.move.run_sequence(self.my_sequence())   # note the () — pass the generator
+        #       self.state = State.APPROACH
+        #
+        #   elif self.state == State.APPROACH:
+        #       pass   # nothing needed here; the sequence drives itself to completion
+
+        self._sequence = sequence_gen
+        self._on_complete = self._advance_sequence
+        # kick off the first step immediately
+        self._advance_sequence()
 
 
 class Rescue(LifecycleNode):
