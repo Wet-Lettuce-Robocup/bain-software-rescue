@@ -180,8 +180,6 @@ class Movement():
         #   def my_sequence(self):
         #       self.move.drive(0.5, 0, 0.1)
         #       yield
-        #       self.move.drive(0, math.pi/2, 0.1)
-        #       yield
         #       if self.tof_distance < 0.2:
         #           self.move.drive(-0.1, 0, 0.1)
         #       else:
@@ -513,7 +511,21 @@ class Rescue(LifecycleNode):
 
         elif self.state == State.APPROACH:
             self.get_logger().info('Approaching victim and storing')
-            # logic for approaching the victim and storing
+            # rotate toward black victim
+            # check if black victim is detected by front vision
+            # check distance to victim
+            # drive forward 1/2 of the distance to the victim
+            # check again if victim is detected by front vision
+            # if still detected, drive forward new distance - 125mm
+            # move claw down
+            # open claw
+            # turn right until claw tof sees <90mm
+            # drive forward until claw tof sees <50mm
+            # close claw to grab victim
+            # drive backward 0.1m
+            # lift claw
+            # release claw
+            # return to start search state
             self.state = State.LOCALISE
 
         elif self.state == State.RESCUE:
