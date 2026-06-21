@@ -443,13 +443,13 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == State.ENTER:
-            self.move.drive(0.03, 0, 0.02)
+            self.move.drive(0.03, 0, 0.01)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 0.03, 0.02)
+                self.move.drive(0, 0.03, 0.01)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
@@ -460,7 +460,7 @@ class Rescue(LifecycleNode):
         elif self.state == State.START_SEARCH:
             # if scan_detections sees something, record the angle turned
             self.front_vision_enable_pub.publish(Bool(data=True)) # enable front vision to start searching
-            #self.rotate(0, math.pi, 0.1) # roate slowly to search for objects
+            self.rotate(0, 0.06, 0.1) # roate slowly to search for objects
             self.state = State.SEARCH
         
         elif self.state == State.SEARCH:
