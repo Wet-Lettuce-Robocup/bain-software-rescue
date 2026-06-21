@@ -443,13 +443,13 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == State.ENTER:
-            self.move.drive(0.03, 0, 0.01)
+            self.move.drive(0.03, 0, 0.015)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 0.03, 0.01)
+                self.move.drive(0, 0.03, 0.015)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
