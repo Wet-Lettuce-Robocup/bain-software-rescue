@@ -283,6 +283,7 @@ class Rescue(LifecycleNode):
     def on_activate(self, state):
         self.get_logger().info('Activating...')
         self.control_timer = self.create_timer(0.01, self.rescue_control_loop)
+        self.move_client.wait_for_server()
 
         return TransitionCallbackReturn.SUCCESS
 
