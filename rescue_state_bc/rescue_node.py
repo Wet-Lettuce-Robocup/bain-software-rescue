@@ -9,6 +9,7 @@ from std_msgs.msg import Int32, Bool, ColorRGBA
 from sensor_msgs.msg import LaserScan
 from rclpy.action import ActionClient
 from robot_msgs.action import MoveTime
+from geometry_msgs.msg import Twist
 import math
 import matplotlib.pyplot as plt
 
@@ -202,7 +203,10 @@ class Movement():
 
 class Rescue(LifecycleNode):
     detected_objects = []
+    # detected objects format: list of {'type': <str>, 'visible': <bool>, 'bearing': <float radians>, 'xpixel': <int>, 'distance': <float meters>}
     dist_scan_samples = []
+    silver_victims_collected = 0
+    black_victims_collected = 0
     robot_position = (0, 0) # x, y coordinates of the robot in the rescue area
     current_angle = 0 # angle the robot is currently facing, relative to the direction it
     latest_map = None
@@ -270,12 +274,15 @@ class Rescue(LifecycleNode):
             '/scan',
             10
         )
-
-        # LED command publisher for first LED (index 0)
         self.led_cmd_pub = self.create_publisher(
             LEDCommand,
             'led_command',
             10,
+        )
+        self.cmd_vel_pub = self.create_publisher(
+            Twist,
+            '/cmd_vel',
+            10
         )
 
         return TransitionCallbackReturn.SUCCESS
@@ -433,6 +440,19 @@ class Rescue(LifecycleNode):
         except Exception as e:
             self.get_logger().error(f'Failed to publish LEDCommand: {e}')
 
+    def publish_cmd_vel(self, linear_x=0.0, angular_z=0.0):
+        if self.cmd_vel_pub is None:
+            return
+
+        twist = Twist()
+        twist.linear.x = linear_x
+        twist.angular.z = angular_z
+
+        try:
+            self.cmd_vel_pub.publish(twist)
+        except Exception as e:
+            self.get_logger().error(f'Failed to publish cmd_vel: {e}')
+
     def rescue_control_loop(self):
         #self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
@@ -443,69 +463,88 @@ class Rescue(LifecycleNode):
                 self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
             self._last_state = self.state
 
-        if self.state == State.ENTER:
-            self.move.drive(0.03, 0, 0.015)
-            self.state = State.ENTER_DRIVE
+        if self.state == 1:
+            self.move.drive(0.03, 0, 100) # go in
+            self.state = 2
 
-        elif self.state == State.ENTER_DRIVE:
+        elif self.state == 2:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 0.05, 0.015)
-                self.state = State.ENTER_ROTATE
+                self.move.drive(0, 0.05, 100) # rotate right
+                self.state = 3
 
-        elif self.state == State.ENTER_ROTATE:
+        elif self.state == 3:
             # wait for the initial rotation to finish, then begin searching
             if getattr(self.move, 'busy', False) == False:
-                self.state = State.START_SEARCH
+                self.detected_objects = []  # clear any old detections from startup
+                # START TOBY NODE
+                # stop toby node
+                if self.silver_victims_collected == 2:
+                    self.state = 5 
+                if any(obj['type'] == 'silver' for obj in self.detected_objects):
+                    self.state = 6 #go grab silver
+                else:
+                    self.state = 4
 
-        elif self.state == State.START_SEARCH:
-            # if scan_detections sees something, record the angle turned
-            self.front_vision_enable_pub.publish(Bool(data=True)) # enable front vision to start searching
-            self.rotate(0, 0.1, 0.015) # roate slowly to search for objects
-            self.state = State.SEARCH
+        elif self.state == 4:
+            self.move.drive(0, 0.05, -100) # rotate left
+            self.state = 3
         
-        elif self.state == State.SEARCH:
-            # wait for sweep to finish, or if detections found
-            if getattr(self.move, 'busy', False) == False and len(self.detected_objects) > 0:
-                self.front_vision_enable_pub.publish(Bool(data=False))
-                self.get_logger().info(f'Detected objects: {self.detected_objects}')
-                self.get
-                self.rotate(0, 1, 0.1) # rotate back to original orientation
-                self.state = State.MAP
-
-        elif self.state == State.START_MAP:
-            # clear previous samples and start a full rotation to map surroundings
-            self.dist_scan_samples = []
-            self._last_sample_angle = None
-            self.rotate(0, 2 * math.pi, 0.1)
-            self.state = State.MAP
-
-        elif self.state == State.MAP:
-            # while rotating, sample TOF and record (angle, distance)
-            try:
-                angle = float(self.move.current_angle)
-            except Exception:
-                angle = float(getattr(self.move, 'current_angle', 0.0))
-
-            do_append = False
-            if self._last_sample_angle is None:
-                do_append = True
-            elif abs(angle - self._last_sample_angle) > 0.01:
-                do_append = True
-
-            if do_append:
-                self.dist_scan_samples.append({
-                    'angle': angle,
-                    'distance': float(self.tof_distance)
-                })
-                self._last_sample_angle = angle
-
-            # if rotation finished, publish and move on
+        elif self.state == 5: #find black
             if getattr(self.move, 'busy', False) == False:
-                self.get_logger().info('Completed mapping rotation; publishing scan')
-                self.analyse_scan()
-                self.state = State.APPROACH
+                self.detected_objects = []  # clear any old detections from startup
+                # start toby node
+                # stop toby node
+                if any(obj['type'] == 'black' for obj in self.detected_objects):
+                    self.state = 7 #go grab black
+                else:
+                    self.move.drive(0, 0.05, -0.100) # rotate left
 
+        elif self.state == 6: # go grab silver
+            # get list number of silver victims
+            for obj in self.detected_objects:
+                if obj['type'] == 'silver':
+                    bearing = obj['bearing']
+                    self.move.drive(0, bearing, 100) # rotate to face victim
+                    self.state = 7
+
+        elif self.state == 7:
+            if getattr(self.move, 'busy', False) == False:
+                self.detected_objects = []  # clear any old detections from startup
+                # start toby node
+                # stop toby node
+                if any(obj['type'] == 'black' or 'silver' for obj in self.detected_objects):
+                    for obj in self.detected_objects:
+                        if obj['type'] == 'silver':
+                            bearing = obj['bearing']
+                            if bearing < 0.2: # if the victim is roughly in front of us, approach
+                                self.move.drive(0.2, obj['distance']-0.001, 0.015) # CHANGE 0.001
+                                self.state = 8
+                else:
+                    self.get_logger().warn('Silver Victim disappeared, returning to search')
+                    self.state = 3 # return to search
+        
+        elif self.state == 8:
+            if getattr(self.move, 'busy', False) == False:
+                # claw lift down
+                # open claw
+                self.publish_cmd_vel(50, 20)
+                self.state = 9
+        
+        elif self.state == 9:
+            if self.tof_distance < 30:
+                self.publish_cmd_vel(0, 0)
+                # close claw to grab victim
+                self.move.drive(-0.1, 0, 0.015) # pull ball back
+                self.state = 10
+    
+        elif self.state == 7: # go grab black
+            for obj in self.detected_objects:
+                if obj['type'] == 'black':
+                    bearing = obj['bearing']
+                    self.face_bearing(bearing) # rotate to face victim
+
+            #go back to where we were
 
         elif self.state == State.APPROACH:
             self.get_logger().info('Approaching victim and storing')
