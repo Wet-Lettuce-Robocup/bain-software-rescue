@@ -13,19 +13,6 @@ from geometry_msgs.msg import Twist
 import math
 import matplotlib.pyplot as plt
 
-class State(Enum):
-    ENTER = auto()        # initial state when the robot enters the rescue area
-    ENTER_DRIVE = auto()  # driving into rescue area (non-blocking)
-    ENTER_ROTATE = auto() # rotating to initial heading (non-blocking)
-    START_SEARCH = auto() # start searching (kick off rotation / vision)
-    SEARCH = auto()       # searching for the victims and ball trays
-    START_MAP = auto()    # prepare to map (clear samples, start rotation)
-    MAP = auto()          # mapping with distance sensor
-    LOCALISE = auto()     # localise
-    APPROACH = auto()     # approaching the victim and storing
-    RESCUE = auto()       # releasing victims into trays
-    EXIT = auto()         # exiting the rescue area after rescuing the victims
-
 class Movement():
     def __init__(self, node):
         self.node = node
@@ -213,7 +200,7 @@ class Rescue(LifecycleNode):
 
     def __init__(self):
         super().__init__('rescue_node')
-        self.state = State.ENTER
+        self.state = 1
         self._last_state = None
         # control timer handle
         self.control_timer = None
@@ -290,7 +277,7 @@ class Rescue(LifecycleNode):
     def on_activate(self, state):
         self.get_logger().info('Activating...')
         self.control_timer = self.create_timer(0.01, self.rescue_control_loop)
-        self.move_client.wait_for_server()
+        self.move.move_client.wait_for_server()
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -407,24 +394,24 @@ class Rescue(LifecycleNode):
         plt.savefig('scan_map.png')
         self.get_logger().info('Saved scan map to scan_map.png')
             
-    def _publish_led_for_state(self, state: State) -> None:
+    def _publish_led_for_state(self, state) -> None:
         """Publish an LEDCommand for the first LED (index 0) based on state."""
         if self.led_cmd_pub is None:
             return
 
         # mapping of states to RGBA colors
         mapping = {
-            State.ENTER: (0.0, 0.0, 1.0, 1.0),        # blue
-            State.ENTER_DRIVE: (0.0, 1.0, 0.0, 1.0),  # green
-            State.ENTER_ROTATE: (1.0, 1.0, 0.0, 1.0), # yellow
-            State.START_SEARCH: (1.0, 0.0, 1.0, 1.0), # magenta
-            State.SEARCH: (0.0, 1.0, 1.0, 1.0),       # cyan
-            State.START_MAP: (1.0, 0.5, 0.0, 1.0),    # orange
-            State.MAP: (0.5, 0.0, 0.5, 1.0),          # purple
-            State.LOCALISE: (1.0, 1.0, 1.0, 1.0),     # white
-            State.APPROACH: (0.5, 1.0, 0.0, 1.0),     # lime
-            State.RESCUE: (1.0, 0.0, 0.0, 1.0),       # red
-            State.EXIT: (0.0, 0.0, 0.0, 1.0),         # off
+            1: (0.0, 0.0, 1.0, 1.0),        # blue
+            2: (0.0, 1.0, 0.0, 1.0),  # green
+            3: (1.0, 1.0, 0.0, 1.0), # yellow
+            4: (1.0, 0.0, 1.0, 1.0), # magenta
+            5: (0.0, 1.0, 1.0, 1.0),       # cyan
+            6: (1.0, 0.5, 0.0, 1.0),    # orange
+            7: (0.5, 0.0, 0.5, 1.0),          # purple
+            8: (1.0, 1.0, 1.0, 1.0),     # white
+            9: (0.5, 1.0, 0.0, 1.0),     # lime
+            10: (1.0, 0.0, 0.0, 1.0),       # red
+            11: (0.0, 0.0, 0.0, 1.0),         # off
         }
 
         rgba = mapping.get(state, (0.0, 0.0, 0.0, 1.0))
