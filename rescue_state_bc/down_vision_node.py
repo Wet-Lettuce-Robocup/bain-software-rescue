@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from cv_bridge import CvBridge
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Float32
 from robot_msgs.msg import Detections as DetectionsMsg
@@ -11,6 +12,7 @@ class DownVisionNode(Node):
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()
+        self.bridge = CvBridge()
         self.declare_parameter('camera_topic', '/down_camera/camera_node/image_raw')
 
         # subscriptions

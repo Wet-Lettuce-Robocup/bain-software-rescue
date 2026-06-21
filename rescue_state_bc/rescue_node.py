@@ -298,7 +298,7 @@ class Rescue(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
     
     def detection_callback(self, msg):
-        # record detections from camera with absolute bearing (robot frame)
+        # record detections from camera with absolute bearing AND pixel location
         try:
             bearing = float(msg.bearing) + float(self.move.current_angle)
         except Exception:
@@ -310,7 +310,8 @@ class Rescue(LifecycleNode):
             'type': getattr(msg, 'type', None),
             'visible': getattr(msg, 'visible', True),
             'bearing': bearing,
-            'distance': getattr(msg, 'distance', 0.0)
+            'xpixel': getattr(msg, 'xpixel', None),
+            'distance': getattr(msg, 'distance', None)
         })
 
     def laser_scan_callback(self, msg):
@@ -386,7 +387,7 @@ class Rescue(LifecycleNode):
                 'y': y
             })
         
-    def draw_map(self):
+    def draw_map(self): #DEBUGGING 
         # draws a map and saves an image (for debugging)
         x = [p['x'] for p in self.scan_points]
         y = [p['y'] for p in self.scan_points]
@@ -431,6 +432,7 @@ class Rescue(LifecycleNode):
         except Exception as e:
             self.get_logger().error(f'Failed to publish LEDCommand: {e}')
     def rescue_control_loop(self):
+        self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
         if getattr(self, '_last_state', None) != self.state:
             try:
@@ -440,27 +442,21 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == State.ENTER:
-            self.get_logger().info('Entering rescue area')
-            # start non-blocking drive into the rescue area
             self.move.drive(0.25, 0, 0.1)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
-            self.get_logger().info('Initial drive complete, starting initial rotation')
             if getattr(self.move, 'busy', False) == False:
                 self.rotate(0, -math.pi/2, 0.1)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
             # wait for the initial rotation to finish, then begin searching
-            self.get_logger().info('Initial rotation complete, starting search')
             if getattr(self.move, 'busy', False) == False:
                 self.state = State.START_SEARCH
 
         elif self.state == State.START_SEARCH:
-            self.get_logger().info('Searching for victims and ball trays')
-
             # if scan_detections sees something, record the angle turned
             self.front_vision_enable_pub.publish(Bool(data=True)) # enable front vision to start searching
             self.rotate(0, math.pi, 0.1) # roate slowly to search for objects
@@ -471,11 +467,11 @@ class Rescue(LifecycleNode):
             if getattr(self.move, 'busy', False) == False and len(self.detected_objects) > 0:
                 self.front_vision_enable_pub.publish(Bool(data=False))
                 self.get_logger().info(f'Detected objects: {self.detected_objects}')
-                self.rotate(0, -math.pi/2, 1) # rotate back to original orientation
+                self.get
+                self.rotate(0, -math.pi/2, 0.1) # rotate back to original orientation
                 self.state = State.MAP
 
         elif self.state == State.START_MAP:
-            self.get_logger().info('Mapping with distance sensor')
             # clear previous samples and start a full rotation to map surroundings
             self.dist_scan_samples = []
             self._last_sample_angle = None
@@ -512,6 +508,7 @@ class Rescue(LifecycleNode):
         elif self.state == State.APPROACH:
             self.get_logger().info('Approaching victim and storing')
             # rotate toward black victim
+            
             # check if black victim is detected by front vision
             # check distance to victim
             # drive forward 1/2 of the distance to the victim
