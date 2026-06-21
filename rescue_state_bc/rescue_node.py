@@ -433,7 +433,7 @@ class Rescue(LifecycleNode):
             self.get_logger().error(f'Failed to publish LEDCommand: {e}')
 
     def rescue_control_loop(self):
-        self.get_logger().info(f'STATE: {self.state.name}')
+        #self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
         if getattr(self, '_last_state', None) != self.state:
             try:
