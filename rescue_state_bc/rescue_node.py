@@ -460,7 +460,7 @@ class Rescue(LifecycleNode):
         elif self.state == State.START_SEARCH:
             # if scan_detections sees something, record the angle turned
             self.front_vision_enable_pub.publish(Bool(data=True)) # enable front vision to start searching
-            self.rotate(0, 0.06, 0.1) # roate slowly to search for objects
+            self.rotate(0, 0.06, 0.015) # roate slowly to search for objects
             self.state = State.SEARCH
         
         elif self.state == State.SEARCH:
