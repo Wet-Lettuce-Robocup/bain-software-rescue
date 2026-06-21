@@ -448,7 +448,7 @@ class Rescue(LifecycleNode):
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0.5, 1, 0.05) 
+                self.move.drive(0, 1, 0.05) 
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
