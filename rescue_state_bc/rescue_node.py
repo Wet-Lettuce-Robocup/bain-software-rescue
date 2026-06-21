@@ -451,7 +451,7 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == 1:
-            self.move.drive(80, 0, 100) # go in
+            self.move.drive(150, 0, 100) # go in
             self.state = 2
 
         elif self.state == 2:
