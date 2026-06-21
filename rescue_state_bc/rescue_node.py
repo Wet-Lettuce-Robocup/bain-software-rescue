@@ -442,13 +442,13 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == State.ENTER:
-            self.move.drive(0.25, 0, 0.1)
+            self.move.drive(0.5, 0, 0.5)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.rotate(0, -math.pi/2, 0.1)
+                self.move.drive(0, 0, 0.1) 
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
@@ -468,7 +468,7 @@ class Rescue(LifecycleNode):
                 self.front_vision_enable_pub.publish(Bool(data=False))
                 self.get_logger().info(f'Detected objects: {self.detected_objects}')
                 self.get
-                self.rotate(0, -math.pi/2, 0.1) # rotate back to original orientation
+                self.rotate(0, 1, 0.1) # rotate back to original orientation
                 self.state = State.MAP
 
         elif self.state == State.START_MAP:
