@@ -431,6 +431,7 @@ class Rescue(LifecycleNode):
             self.led_cmd_pub.publish(cmd)
         except Exception as e:
             self.get_logger().error(f'Failed to publish LEDCommand: {e}')
+
     def rescue_control_loop(self):
         self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
@@ -442,13 +443,13 @@ class Rescue(LifecycleNode):
             self._last_state = self.state
 
         if self.state == State.ENTER:
-            self.move.drive(0.05, 0, 0.03)
+            self.move.drive(0.03, 0, 0.02)
             self.state = State.ENTER_DRIVE
 
         elif self.state == State.ENTER_DRIVE:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 0.05, 0.03) 
+                self.move.drive(0, 0.03, 0.02)
                 self.state = State.ENTER_ROTATE
 
         elif self.state == State.ENTER_ROTATE:
