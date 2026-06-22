@@ -457,7 +457,7 @@ class Rescue(LifecycleNode):
         elif self.state == 2:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 0.05, 100) # rotate right
+                self.move.drive(0, 100, 100) # rotate right
                 self.state = 3
 
         elif self.state == 3:
@@ -474,7 +474,7 @@ class Rescue(LifecycleNode):
                     self.state = 4
 
         elif self.state == 4:
-            self.move.drive(0, 0.05, -100) # rotate left
+            self.move.drive(0, 100, -100) # rotate left
             self.state = 3
         
         elif self.state == 5: #find black
@@ -485,7 +485,7 @@ class Rescue(LifecycleNode):
                 if any(obj['type'] == 'black' for obj in self.detected_objects):
                     self.state = 7 #go grab black
                 else:
-                    self.move.drive(0, 0.05, -0.100) # rotate left
+                    self.move.drive(0, 100, -0.100) # rotate left
 
         elif self.state == 6: # go grab silver
             # get list number of silver victims
@@ -505,7 +505,7 @@ class Rescue(LifecycleNode):
                         if obj['type'] == 'silver':
                             bearing = obj['bearing']
                             if bearing < 0.2: # if the victim is roughly in front of us, approach
-                                self.move.drive(0.2, obj['distance']-0.001, 0.015) # CHANGE 0.001
+                                self.move.drive(0.2, obj['distance']-10, 100) # CHANGE 0.001
                                 self.state = 8
                 else:
                     self.get_logger().warn('Silver Victim disappeared, returning to search')
@@ -522,7 +522,7 @@ class Rescue(LifecycleNode):
             if self.tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
                 # close claw to grab victim
-                self.move.drive(-0.1, 0, 0.015) # pull ball back
+                self.move.drive(100, 0, 100) # pull ball back
                 self.state = 10
     
         elif self.state == 7: # go grab black
@@ -533,10 +533,8 @@ class Rescue(LifecycleNode):
 
             #go back to where we were
 
-        elif self.state == State.APPROACH:
-            self.get_logger().info('Approaching victim and storing')
+        elif self.state == 99:
             # rotate toward black victim
-            
             # check if black victim is detected by front vision
             # check distance to victim
             # drive forward 1/2 of the distance to the victim
@@ -551,20 +549,6 @@ class Rescue(LifecycleNode):
             # lift claw
             # release claw
             # return to start search state
-            self.state = State.LOCALISE
-
-        elif self.state == State.RESCUE:
-            self.get_logger().info('Rescuing victims into trays')
-            # logic for rescuing victims into trays
-
-            self.state = State.EXIT
-
-
-        elif self.state == State.EXIT:
-            self.get_logger().info('Exiting rescue area')
-            # logic for exiting the rescue area after rescuing the victims
-
-            self.on_deactivate() # deactivate the node after exiting the rescue area
 
 def main(args=None):
     rclpy.init(args=args)
