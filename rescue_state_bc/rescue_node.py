@@ -197,6 +197,8 @@ class Rescue(LifecycleNode):
     robot_position = (0, 0) # x, y coordinates of the robot in the rescue area
     current_angle = 0 # angle the robot is currently facing, relative to the direction it
     latest_map = None
+    exit_kp = 0.5 # proportional gain for exit behavior
+    black_line_seen = False
 
     def __init__(self):
         super().__init__('rescue_node')
@@ -232,6 +234,12 @@ class Rescue(LifecycleNode):
             Int32,
             '/tof_front',
             self.laser_scan_callback,
+            10
+        )
+        self.black_line_subscriber = self.create_subscription(
+            Bool,
+            '/black_present',
+            self.black_line_callback,
             10
         )
 
@@ -309,6 +317,10 @@ class Rescue(LifecycleNode):
             'distance': getattr(msg, 'distance', None)
         })
 
+    def black_line_callback(self, msg):
+        if msg.data:
+            self.black_line_seen = True
+
     def laser_scan_callback(self, msg):
         # tof publishes an integer (mm) — convert to meters
         try:
@@ -329,70 +341,6 @@ class Rescue(LifecycleNode):
         self.move.drive(distance, angle, rotate_vel)
         # optimistic update
         self.move.current_angle = (self.move.current_angle + angle) % (2 * math.pi)
-
-    def publish_scan(self):
-        scan = LaserScan()
-
-        if len(self.dist_scan_samples) < 3:
-            self.get_logger().warn('Not enough scan samples to publish')
-            return
-
-        scan.header.frame_id = "base_link"
-        scan.header.stamp = self.get_clock().now().to_msg()
-
-        # data entries: list of {'angle': <rad>, 'distance': <m>}
-        data = sorted(self.dist_scan_samples, key=lambda x: x['angle'])
-
-        scan.angle_min = float(data[0]['angle'])
-        scan.angle_max = float(data[-1]['angle'])
-
-        n = len(data)
-        scan.angle_increment = (scan.angle_max - scan.angle_min) / max(n - 1, 1)
-
-        # convert sensor readings (from sensor origin) to ranges relative to base_link (pivot)
-        ranges = []
-        for entry in data:
-            d = float(entry['distance'])
-            if math.isfinite(d) and d > 0.0:
-                # add the forward offset of the sensor
-                r = d + self.sensor_offset
-            else:
-                r = float('inf')
-            ranges.append(r)
-
-        scan.ranges = ranges
-        # optional metadata
-        scan.range_min = 0.02
-        scan.range_max = 30.0
-
-        self.scan_pub.publish(scan)
-        self.get_logger().info(f'Published scan with {n} samples')
-
-        # clear collected samples
-        self.dist_scan_samples = []
-
-    def analyse_scan(self):
-        # converts the polar samples to cartesian coords
-        for sample in self.dist_scan_samples:
-            x = sample['distance'] * math.cos(sample['angle'])
-            y = sample['distance'] * math.sin(sample['angle'])
-            sample['angle']
-            self.scan_points.append({
-                'x': x,
-                'y': y
-            })
-        
-    def draw_map(self): #DEBUGGING 
-        # draws a map and saves an image (for debugging)
-        x = [p['x'] for p in self.scan_points]
-        y = [p['y'] for p in self.scan_points]
-        plt.scatter(x, y)
-        plt.xlabel('X (m)')
-        plt.ylabel('Y (m)')
-        plt.title('Scan Map')
-        plt.axis('equal')
-        plt.savefig('scan_map.png')
-        self.get_logger().info('Saved scan map to scan_map.png')
             
     def _publish_led_for_state(self, state) -> None:
         """Publish an LEDCommand for the first LED (index 0) based on state."""
@@ -550,6 +498,31 @@ class Rescue(LifecycleNode):
             # release claw
             # return to start search state
             pass
+
+        elif self.state == 100: # exit
+            kp = (60-self.tof_distance) * self.exit_kp # stay constant dist from left wall
+            self.publish_cmd_vel(200, kp) # drive forward with proportional control based on distance to exit
+            if self.tof_distance > 150:
+                self.publish_cmd_vel(0, 0)
+                self.get_logger().info('found potential exit')
+                self.move.drive(0, 180, -100) # rotate left
+                self.state = 101
+    
+        elif self.state == 101:
+            if getattr(self.move, 'busy', False) == False:
+                self.black_line_seen = False
+                # enable down vision 
+                self.publish_cmd_vel(90, 0) # drive forward
+                if self.black_line_seen:
+                    self.publish_cmd_vel(0, 0)
+                    self.get_logger().info('Black line seen, exit confirmed')
+                    self.move.drive(100, 0, 100) # drive out of exit
+                    self.state = 102
+
+        elif self.state == 102:
+            pass
+        # DEACTIVATE
+
 
 def main(args=None):
     rclpy.init(args=args)

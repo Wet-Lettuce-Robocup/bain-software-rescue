@@ -9,6 +9,7 @@ import numpy as np
 
 class DownVisionNode(Node):
     vision_enabled = False
+    black_line_size = 2000
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()
@@ -37,6 +38,11 @@ class DownVisionNode(Node):
         self.silver_present_pub = self.create_publisher(
             Bool,
             '/silver_present',
+            10
+        )
+        self.black_line_pub = self.create_publisher(
+            Bool,
+            '/black_present',
             10
         )
 
@@ -82,6 +88,16 @@ class DownVisionNode(Node):
         # find the angle of the silver strip relative to the robot
         # can use this to align with the strip and follow it
         pass
+
+    def detect_black_line(self, image):
+        image = cv.inRange(image, (0,0,0), (50,50,50)) # NEED Upadate
+        line = Bool()
+        if cv.countNonZero(image) > self.black_line_size:
+            self.get_logger().info('Black line detected')
+            line.data = True
+        else:
+            line.data = False
+        self.black_line_pub.publish(line)
 
 def main(args=None):
     rclpy.init(args=args)
