@@ -457,7 +457,7 @@ class Rescue(LifecycleNode):
         elif self.state == 2:
             # wait for the initial drive to finish, then start rotation
             if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 200, 100) # rotate right
+                self.move.drive(0, 180, 100) # rotate right
                 self.state = 3
 
         elif self.state == 3:
@@ -474,7 +474,7 @@ class Rescue(LifecycleNode):
                     self.state = 4
 
         elif self.state == 4:
-            self.move.drive(0, 200, -100) # rotate left
+            self.move.drive(0, 180, -100) # rotate left
             self.state = 3
         
         elif self.state == 5: #find black
@@ -485,7 +485,7 @@ class Rescue(LifecycleNode):
                 if any(obj['type'] == 'black' for obj in self.detected_objects):
                     self.state = 7 #go grab black
                 else:
-                    self.move.drive(0, 200, -0.100) # rotate left
+                    self.move.drive(0, 180, -100) # rotate left
 
         elif self.state == 6: # go grab silver
             # get list number of silver victims
