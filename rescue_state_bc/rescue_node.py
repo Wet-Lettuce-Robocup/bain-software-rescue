@@ -230,9 +230,21 @@ class Rescue(LifecycleNode):
             self.detection_callback,
             10
         )
-        self.tof_subscriber = self.create_subscription(
+        self.front_tof_subscriber = self.create_subscription(
             Int32,
             '/tof_front',
+            self.laser_scan_callback,
+            10
+        )
+        self.claw_tof_subscriber = self.create_subscription(
+            Int32,
+            '/tof_claw',
+            self.laser_scan_callback,
+            10
+        )
+        self.side_tof_subscriber = self.create_subscription(
+            Int32,
+            '/tof_side',
             self.laser_scan_callback,
             10
         )
@@ -247,6 +259,11 @@ class Rescue(LifecycleNode):
         self.front_vision_enable_pub = self.create_publisher(
             Bool,
             '/front_vision_enable',
+            10
+        )
+        self.down_vision_enable_pub = self.create_publisher(
+            Bool,
+            '/down_vision_enable',
             10
         )
         self.fan_pub = self.create_publisher(
@@ -324,9 +341,17 @@ class Rescue(LifecycleNode):
     def laser_scan_callback(self, msg):
         # tof publishes an integer (mm) — convert to meters
         try:
-            self.tof_distance = float(msg.data) / 1000.0
+            self.front_tof_distance = float(msg.data) / 1000.0
         except Exception:
-            self.tof_distance = float(getattr(msg, 'data', float('inf')))
+            self.front_tof_distance = float(getattr(msg, 'data', float('inf')))
+        try:
+            self.claw_tof_distance = float(msg.data) / 1000.0
+        except Exception:
+            self.claw_tof_distance = float(getattr(msg, 'data', float('inf')))
+        try:
+            self.side_tof_distance = float(msg.data) / 1000.0
+        except Exception:
+            self.side_tof_distance = float(getattr(msg, 'data', float('inf')))
 
     def face_bearing(self, bearing: float, rotate_vel=0.1):
         current = self.move.current_angle
@@ -388,6 +413,27 @@ class Rescue(LifecycleNode):
         except Exception as e:
             self.get_logger().error(f'Failed to publish cmd_vel: {e}')
 
+    def _find_target(self, target_type):
+        for obj in self.detected_objects:
+            if obj.get('type') == target_type:
+                return obj
+        return None
+
+    def _current_target_type(self):
+        # Silver first, then black
+        return 'silver' if self.silver_victims_collected < 2 else 'black'
+
+    def rescue_control_loop(self):
+        # Publish LED only when state changes
+        if getattr(self, '_last_state', None) != self.state:
+            try:
+                self._publish_led_for_state(self.state)
+            except Exception as e:
+                self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
+            self._last_state = self.state
+
+        current_target = self._current_target_type()
+
     def rescue_control_loop(self):
         #self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
@@ -398,86 +444,89 @@ class Rescue(LifecycleNode):
                 self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
             self._last_state = self.state
 
+        # move in
         if self.state == 1:
-            self.move.drive(140, 0, 100) # go in
-            self.state = 2
+                self.move.drive(140, 0, 100)
+                self.state = 2
 
+        # wait for drive in to finish then rotate right
         elif self.state == 2:
-            # wait for the initial drive to finish, then start rotation
-            if getattr(self.move, 'busy', False) == False:
-                self.move.drive(0, 180, 100) # rotate right
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(0, 180, 100)
                 self.state = 3
 
+        # search for the current target
         elif self.state == 3:
-            # wait for the initial rotation to finish, then begin searching
-            if getattr(self.move, 'busy', False) == False:
-                self.detected_objects = []  # clear any old detections from startup
-                # START TOBY NODE
-                # stop toby node
-                if self.silver_victims_collected == 2:
-                    self.state = 5 
-                if any(obj['type'] == 'silver' for obj in self.detected_objects):
-                    self.state = 6 #go grab silver
+            if not getattr(self.move, 'busy', False):
+                target = self._find_target(current_target)
+                if target is not None:
+                    self.target_type = current_target
+                    self.target_detection = target
+                    self.state = 5
                 else:
+                    self.move.drive(0, 180, -100)
                     self.state = 4
 
+        # keep scanning by rotating left, then go back to search
         elif self.state == 4:
-            self.move.drive(0, 180, -100) # rotate left
-            self.state = 3
-        
-        elif self.state == 5: #find black
-            if getattr(self.move, 'busy', False) == False:
-                self.detected_objects = []  # clear any old detections from startup
-                # start toby node
-                # stop toby node
-                if any(obj['type'] == 'black' for obj in self.detected_objects):
-                    self.state = 7 #go grab black
+            if not getattr(self.move, 'busy', False):
+                self.state = 3
+
+        # align to target bearing
+        elif self.state == 5:
+            target = self._find_target(self.target_type)
+            if target is None:
+                self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
+                self.state = 3
+            else:
+                bearing = target['bearing']
+                self.move.drive(0, bearing, 100)
+                self.state = 6
+
+        # wait for alignment, then approach target
+        elif self.state == 6:
+            if not getattr(self.move, 'busy', False):
+                target = self._find_target(self.target_type)
+                if target is None:
+                    self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
+                    self.state = 3
                 else:
-                    self.move.drive(0, 180, -100) # rotate left
+                    bearing = target['bearing']
+                    if abs(bearing) < 0.2:
+                        distance = target['distance']
+                        self.move.drive(0.2, distance - 10, 100)
+                        self.state = 7
+                    else:
+                        self.state = 5
 
-        elif self.state == 6: # go grab silver
-            # get list number of silver victims
-            for obj in self.detected_objects:
-                if obj['type'] == 'silver':
-                    bearing = obj['bearing']
-                    self.move.drive(0, bearing, 100) # rotate to face victim
-                    self.state = 7
-
+        # wait until close, then lower/open claw
         elif self.state == 7:
-            if getattr(self.move, 'busy', False) == False:
-                self.detected_objects = []  # clear any old detections from startup
-                # start toby node
-                # stop toby node
-                if any(obj['type'] == 'black' or 'silver' for obj in self.detected_objects):
-                    for obj in self.detected_objects:
-                        if obj['type'] == 'silver':
-                            bearing = obj['bearing']
-                            if bearing < 0.2: # if the victim is roughly in front of us, approach
-                                self.move.drive(0.2, obj['distance']-10, 100) # CHANGE 0.001
-                                self.state = 8
-                else:
-                    self.get_logger().warn('Silver Victim disappeared, returning to search')
-                    self.state = 3 # return to search
-        
-        elif self.state == 8:
-            if getattr(self.move, 'busy', False) == False:
-                # claw lift down
-                # open claw
+            if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
-                self.state = 9
-        
-        elif self.state == 9:
-            if self.tof_distance < 30:
+                self.state = 8
+
+        # when claw is close enough, stop and close claw
+        elif self.state == 8:
+            if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
-                # close claw to grab victim
-                self.move.drive(100, 0, -100) # pull ball back
-                self.state = 10
-    
-        elif self.state == 7: # go grab black
-            for obj in self.detected_objects:
-                if obj['type'] == 'black':
-                    bearing = obj['bearing']
-                    self.face_bearing(bearing) # rotate to face victim
+                self.move.drive(100, 0, -100)  # pull victim back
+                self.state = 9
+
+        # wait for pull-back to finish, then count victim and return to search
+        elif self.state == 9:
+            if not getattr(self.move, 'busy', False):
+                if self.target_type == 'silver':
+                    self.silver_victims_collected += 1
+                else:
+                    self.black_victims_collected += 1
+
+                self.target_type = None
+                self.target_detection = None
+
+                if self.silver_victims_collected < 2:
+                    self.state = 3
+                else:
+                    self.state = 3
 
             #go back to where we were
 
@@ -500,9 +549,9 @@ class Rescue(LifecycleNode):
             pass
 
         elif self.state == 100: # exit
-            kp = (60-self.tof_distance) * self.exit_kp # stay constant dist from left wall
+            kp = (60-self.side_tof_distance) * self.exit_kp # stay constant dist from left wall
             self.publish_cmd_vel(200, kp) # drive forward with proportional control based on distance to exit
-            if self.tof_distance > 150:
+            if self.side_tof_distance > 150:
                 self.publish_cmd_vel(0, 0)
                 self.get_logger().info('found potential exit')
                 self.move.drive(0, 180, -100) # rotate left
