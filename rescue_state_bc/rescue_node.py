@@ -549,6 +549,7 @@ class Rescue(LifecycleNode):
             # lift claw
             # release claw
             # return to start search state
+            pass
 
 def main(args=None):
     rclpy.init(args=args)
