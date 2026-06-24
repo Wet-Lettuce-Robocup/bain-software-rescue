@@ -461,6 +461,7 @@ class Rescue(LifecycleNode):
 
         # poll the inference service every control tick to keep detected_objects fresh
         self._request_detections()
+        self.current_target = self._current_target_type()
 
         # move in
         if self.state == 1:
