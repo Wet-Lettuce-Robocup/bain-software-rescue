@@ -319,7 +319,6 @@ class Rescue(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def _request_detections(self):
-        """Send an async request to the Inference service and update detected_objects on response."""
         if self._inference_pending:
             return  # don't stack calls while one is in flight
 
@@ -337,7 +336,6 @@ class Rescue(LifecycleNode):
             return
 
         if not response.success:
-            self.get_logger().warn('Inference service returned success=False')
             return
 
         # rebuild detected_objects by zipping the parallel response arrays
