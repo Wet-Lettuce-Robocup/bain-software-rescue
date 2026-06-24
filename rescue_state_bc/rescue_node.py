@@ -336,21 +336,27 @@ class Rescue(LifecycleNode):
             self.get_logger().error(f'Inference service call failed: {e}')
             return
 
-        # rebuild detected_objects from the service response detections list
-        self.detected_objects = []
-        for det in response.detections:
-            try:
-                bearing = float(det.bearing) + float(self.move.current_angle)
-            except Exception:
-                bearing = float(getattr(det, 'bearing', 0.0)) + getattr(self.move, 'current_angle', 0.0)
+        if not response.success:
+            self.get_logger().warn('Inference service returned success=False')
+            return
 
-            self.detected_objects.append({
-                'type': getattr(det, 'type', None),
-                'visible': getattr(det, 'visible', True),
-                'bearing': bearing,
-                'xpixel': getattr(det, 'xpixel', None),
-                'distance': getattr(det, 'distance', None),
-            })
+        # rebuild detected_objects by zipping the parallel response arrays
+        self.detected_objects = [
+            {
+                'type': t,
+                'bearing': b + float(self.move.current_angle),
+                'confidence': c,
+                'distance': d,
+                'cx': x,
+            }
+            for t, b, c, d, x in zip(
+                response.type,
+                response.bearing,
+                response.confidence,
+                response.distance,
+                response.cx,
+            )
+        ]
 
         self.get_logger().debug(f'Inference response: {len(self.detected_objects)} detections')
 
