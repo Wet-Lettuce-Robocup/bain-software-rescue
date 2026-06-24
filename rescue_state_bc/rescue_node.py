@@ -12,6 +12,7 @@ from robot_msgs.action import MoveTime
 from geometry_msgs.msg import Twist
 import math
 import matplotlib.pyplot as plt
+from robot_msgs.srv import Inference
 
 class Movement():
     def __init__(self, node):
@@ -220,16 +221,13 @@ class Rescue(LifecycleNode):
         # LED publisher will be created in on_configure
         self.led_cmd_pub = None
 
+        # inference service call state
+        self._inference_pending = False
+
     def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
         self.move = Movement(self)
         # setup subscriptions
-        self.camera_detection_subscriber = self.create_subscription(
-            Detections,
-            '/scan_detections',
-            self.detection_callback,
-            10
-        )
         self.front_tof_subscriber = self.create_subscription(
             Int32,
             '/tof_front',
@@ -254,6 +252,9 @@ class Rescue(LifecycleNode):
             self.black_line_callback,
             10
         )
+        self.ball_client = self.create_client(Inference, '/ml_rescue/detections')
+        while not self.ball_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info('Waiting for ball service...')
 
         # setup publishers
         self.front_vision_enable_pub = self.create_publisher(
@@ -316,23 +317,42 @@ class Rescue(LifecycleNode):
                 pass
             self.control_timer = None
         return TransitionCallbackReturn.SUCCESS
-    
-    def detection_callback(self, msg):
-        # record detections from camera with absolute bearing AND pixel location
+
+    def _request_detections(self):
+        """Send an async request to the Inference service and update detected_objects on response."""
+        if self._inference_pending:
+            return  # don't stack calls while one is in flight
+
+        self._inference_pending = True
+        req = Inference.Request()
+        future = self.ball_client.call_async(req)
+        future.add_done_callback(self._inference_response_callback)
+
+    def _inference_response_callback(self, future):
+        self._inference_pending = False
         try:
-            bearing = float(msg.bearing) + float(self.move.current_angle)
-        except Exception:
-            bearing = float(getattr(msg, 'bearing', 0.0)) + getattr(self.move, 'current_angle', 0.0)
+            response = future.result()
+        except Exception as e:
+            self.get_logger().error(f'Inference service call failed: {e}')
+            return
 
-        self.get_logger().debug(f'Detection callback bearing={bearing}')
+        # rebuild detected_objects from the service response detections list
+        self.detected_objects = []
+        for det in response.detections:
+            try:
+                bearing = float(det.bearing) + float(self.move.current_angle)
+            except Exception:
+                bearing = float(getattr(det, 'bearing', 0.0)) + getattr(self.move, 'current_angle', 0.0)
 
-        self.detected_objects.append({
-            'type': getattr(msg, 'type', None),
-            'visible': getattr(msg, 'visible', True),
-            'bearing': bearing,
-            'xpixel': getattr(msg, 'xpixel', None),
-            'distance': getattr(msg, 'distance', None)
-        })
+            self.detected_objects.append({
+                'type': getattr(det, 'type', None),
+                'visible': getattr(det, 'visible', True),
+                'bearing': bearing,
+                'xpixel': getattr(det, 'xpixel', None),
+                'distance': getattr(det, 'distance', None),
+            })
+
+        self.get_logger().debug(f'Inference response: {len(self.detected_objects)} detections')
 
     def black_line_callback(self, msg):
         if msg.data:
@@ -424,17 +444,6 @@ class Rescue(LifecycleNode):
         return 'silver' if self.silver_victims_collected < 2 else 'black'
 
     def rescue_control_loop(self):
-        # Publish LED only when state changes
-        if getattr(self, '_last_state', None) != self.state:
-            try:
-                self._publish_led_for_state(self.state)
-            except Exception as e:
-                self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
-            self._last_state = self.state
-
-        current_target = self._current_target_type()
-
-    def rescue_control_loop(self):
         #self.get_logger().info(f'STATE: {self.state.name}')
         # publish LED color on state changes for the first LED
         if getattr(self, '_last_state', None) != self.state:
@@ -443,6 +452,9 @@ class Rescue(LifecycleNode):
             except Exception as e:
                 self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
             self._last_state = self.state
+
+        # poll the inference service every control tick to keep detected_objects fresh
+        self._request_detections()
 
         # move in
         if self.state == 1:
@@ -458,9 +470,9 @@ class Rescue(LifecycleNode):
         # search for the current target
         elif self.state == 3:
             if not getattr(self.move, 'busy', False):
-                target = self._find_target(current_target)
+                target = self._find_target(self.current_target)
                 if target is not None:
-                    self.target_type = current_target
+                    self.target_type = self.current_target
                     self.target_detection = target
                     self.state = 5
                 else:
@@ -527,8 +539,6 @@ class Rescue(LifecycleNode):
                     self.state = 3
                 else:
                     self.state = 3
-
-            #go back to where we were
 
         elif self.state == 99:
             # rotate toward black victim
