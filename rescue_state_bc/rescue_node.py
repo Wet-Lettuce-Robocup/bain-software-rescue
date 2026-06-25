@@ -171,8 +171,6 @@ class Rescue(LifecycleNode):
         self.black_line_subscriber = self.create_subscription(Bool, '/black_present', self.black_line_callback, 10)
 
         self.ball_client = self.create_client(Inference, '/ml_rescue/detections')
-        while not self.ball_client.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('Waiting for ball service...')
 
         self.front_vision_enable_pub = self.create_publisher(Bool, '/front_vision_enable', 10)
         self.down_vision_enable_pub = self.create_publisher(Bool, '/down_vision_enable', 10)
