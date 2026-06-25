@@ -340,24 +340,28 @@ class Rescue(LifecycleNode):
                 self.move.drive(0, 180, 100)
                 self.state = 3
 
-        # search for the current target
+      # search for the current target
         elif self.state == 3:
             if not getattr(self.move, 'busy', False):
                 if self._detection_future is None:
                     self.current_target = self._current_target_type()
                     self._request_detections()
                     self.state = 4
-        
+
         elif self.state == 4:
             if self._detections_ready():
                 target = self._find_target(self.current_target)
                 if target is not None:
-                    self.get_logger().info(f'{self.current_target} victim detected, aligning...')
+                    self.get_logger().info(
+                        f'{self.current_target} victim detected, aligning...'
+                    )
                     self.target_type = self.current_target
                     self.target_detection = target
                     self.state = 6
                 else:
-                    self.get_logger().info(f'No {self.current_target} victim found, rotating...')
+                    self.get_logger().info(
+                        f'No {self.current_target} victim found, rotating...'
+                    )
                     self.move.drive(0, 180, -100)
                     self.state = 5
 
@@ -366,55 +370,31 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.state = 3
 
-        # align to target bearing
+        # align to target bearing using stored detection
         elif self.state == 6:
-            self._request_detections()
-            if self._detections_ready():
-                target = self._find_target(self.target_type)
-                if target is None:
-                    self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
-                    self.state = 3
-                else:
-                    bearing = target['bearing']
-                    if abs(bearing) < 0.2:
-                        # already aligned, go straight to approach
-                        self.state = 7
-                    else:
-                        self.move.drive(0, bearing, 100)
-                        self.state = 7
+            bearing = self.target_detection['bearing']
 
-        # wait for alignment, then approach target
-        elif self.state == 7:
-            if not getattr(self.move, 'busy', False):
-                self._request_detections()
-                if self._detections_ready():
-                    target = self._find_target(self.target_type)
-                    if target is None:
-                        self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
-                        self.state = 3
-                    else:
-                        bearing = target['bearing']
-                        if abs(bearing) < 0.2:
-                            self.move.drive(0.2, target['distance'] - 10, 100)
-                            self.state = 8
-                        else:
-                            self.state = 6
+            if abs(bearing) < 0.2:
+                self.state = 7
+            else:
+                self.move.drive(0, bearing, 100)
+                self.state = 7
 
         # wait until close, then lower/open claw
-        elif self.state == 8:
+        elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
-                self.state = 9
+                self.state = 8
 
         # when claw is close enough, stop and close claw
-        elif self.state == 9:
+        elif self.state == 8:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(100, 0, -100)  # pull victim back
-                self.state = 10
+                self.state = 9
 
         # wait for pull-back to finish, then count victim and return to search
-        elif self.state == 10:
+        elif self.state == 9:
             if not getattr(self.move, 'busy', False):
                 if self.target_type == 'silver':
                     self.silver_victims_collected += 1
