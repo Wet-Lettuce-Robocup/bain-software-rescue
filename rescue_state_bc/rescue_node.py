@@ -457,6 +457,7 @@ class Rescue(LifecycleNode):
         # wait for drive in to finish then rotate right
         elif self.state == 2:
             if not getattr(self.move, 'busy', False):
+                self.get_logger().info('Drive in complete, rotating right')
                 self.move.drive(0, 180, 100)
                 self.state = 3
 
