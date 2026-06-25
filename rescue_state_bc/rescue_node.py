@@ -375,7 +375,6 @@ class Rescue(LifecycleNode):
                     
                     self.state = 2
 
-        # keep scanning by rotating left, then go back to search
         elif self.state == 5:
             if not getattr(self.move, 'busy', False):
                 self.state = 3
@@ -383,28 +382,35 @@ class Rescue(LifecycleNode):
         # align to target bearing using stored detection
         elif self.state == 6:
             bearing = self.target_detection['bearing']
-
-            if abs(bearing) < 0.01:
-                self.state = 7
-            else:
-                self.move.drive(0, bearing, 100)
-                self.state = 7
+            self.move.drive(0, bearing, 100)
+            self.state = 7
 
         # wait until close, then lower/open claw
         elif self.state == 7:
+            # claw down
+            # claw open
             if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
                 self.state = 8
 
-        # when claw is close enough, stop and close claw
+        # when claw is close enough stop
         elif self.state == 8:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
+                # claw close
                 self.move.drive(100, 0, -100)  # pull victim back
                 self.state = 9
 
-        # wait for pull-back to finish, then count victim and return to search
         elif self.state == 9:
+            if not getattr(self.move, 'busy', False):
+                # claw up
+                if self.tartget_type == 'silver':
+                    # claw open
+                    pass #remove
+                self.state = 10
+
+        # count victim and return to search
+        elif self.state == 10:
             if not getattr(self.move, 'busy', False):
                 if self.target_type == 'silver':
                     self.silver_victims_collected += 1
@@ -412,10 +418,9 @@ class Rescue(LifecycleNode):
                     self.black_victims_collected += 1
                 self.target_type = None
                 self.target_detection = None
-                if self.silver_victims_collected < 2:
-                    self.state = 3  # collect next silver
-                else:
-                    self.state = 100  # all silvers done, head for exit
+                if self.silver_victims_collected >= 2 and self.black_victims_collected >= 1:
+                    self.get_logger().info('All victims collected, searching for exit...')
+                self.state = 2
 
         elif self.state == 99:
             pass
