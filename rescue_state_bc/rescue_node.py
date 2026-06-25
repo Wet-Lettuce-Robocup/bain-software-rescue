@@ -222,8 +222,9 @@ class Rescue(LifecycleNode):
         self._detection_future = None
 
         if not response.success:
-            self.get_logger().warn('Inference service returned success=False')
-            return False
+            self.get_logger().log('Inference service returned nothing')
+            self.detected_objects = []
+            return True
 
         self.detected_objects = [
             {
@@ -373,7 +374,7 @@ class Rescue(LifecycleNode):
                         self.move.drive(0, 180, 100)
                     
                     self.state = 2
-                    
+
         # keep scanning by rotating left, then go back to search
         elif self.state == 5:
             if not getattr(self.move, 'busy', False):
