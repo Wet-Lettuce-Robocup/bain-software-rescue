@@ -148,6 +148,7 @@ class Rescue(LifecycleNode):
     latest_map = None
     exit_kp = 0.5
     black_line_seen = False
+    search_step = 0
 
     def __init__(self):
         super().__init__('rescue_node')
@@ -175,7 +176,6 @@ class Rescue(LifecycleNode):
         self.front_vision_enable_pub = self.create_publisher(Bool, '/front_vision_enable', 10)
         self.down_vision_enable_pub = self.create_publisher(Bool, '/down_vision_enable', 10)
         self.fan_pub = self.create_publisher(Int32, '/fan_speed', 10)
-        self.claw_pub = self.create_publisher(Int32, '/claw_command', 10)
         self.drive_pub = self.create_publisher(Int32, '/drive_command', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/scan', 10)
         self.led_cmd_pub = self.create_publisher(LEDCommand, 'led_command', 10)
@@ -224,25 +224,6 @@ class Rescue(LifecycleNode):
         if not response.success:
             self.get_logger().warn('Inference service returned success=False')
             return False
-
-        self.detected_objects = [
-            {
-                'type': t,
-                'bearing': b,
-                'confidence': c,
-                'distance': d,
-                'cx': x,
-            }
-            for t, b, c, d, x in zip(
-                response.type,
-                response.bearing,
-                response.confidence,
-                response.distance,
-                response.cx,
-            )
-        ]
-        self.get_logger().info(f'Detections ready: {len(self.detected_objects)} objects')
-        return True
 
         self.detected_objects = [
             {
@@ -350,8 +331,16 @@ class Rescue(LifecycleNode):
 
         # wait for drive in to finish then rotate right
         elif self.state == 2:
+            # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
-                self.move.drive(0, 180, 100)
+                if self.search_step == 0: # turn right
+                    self.move.drive(0, 180, 100)
+                elif self.search_step == 1: # straight
+                    self.move.drive(0, 180, -100)
+                elif self.search_step == 2: # left 
+                    self.move.drive(0, 180, -100)
+                elif self.search_step == 3: # back  
+                    self.move.drive(0, 180, -100)
                 self.state = 3
 
       # search for the current target
@@ -366,19 +355,25 @@ class Rescue(LifecycleNode):
             if self._detections_ready():
                 target = self._find_target(self.current_target)
                 if target is not None:
-                    self.get_logger().info(
-                        f'{self.current_target} victim detected, aligning...'
-                    )
+                    self.get_logger().info(f'{self.current_target} victim detected, aligning...')
                     self.target_type = self.current_target
                     self.target_detection = target
                     self.state = 6
                 else:
-                    self.get_logger().info(
-                        f'No {self.current_target} victim found, rotating...'
-                    )
-                    self.move.drive(0, 180, -100)
-                    self.state = 5
+                    self.search_step += 1
+                    self.get_logger().info(f'No {self.current_target} victim found, rotating...')
 
+                    if self.silver_victims_collected >= 2:
+                        max_steps = 4 
+                    else:
+                        max_steps = 3
+                        
+                    if self.search_step >= max_steps:
+                        self.search_step = 0 # loop back to 0 after reaching end of cycle
+                        self.move.drive(0, 180, 100)
+                    
+                    self.state = 2
+                    
         # keep scanning by rotating left, then go back to search
         elif self.state == 5:
             if not getattr(self.move, 'busy', False):
@@ -388,7 +383,7 @@ class Rescue(LifecycleNode):
         elif self.state == 6:
             bearing = self.target_detection['bearing']
 
-            if abs(bearing) < 0.2:
+            if abs(bearing) < 0.01:
                 self.state = 7
             else:
                 self.move.drive(0, bearing, 100)
