@@ -209,12 +209,10 @@ class Rescue(LifecycleNode):
 
     def _detections_ready(self):
         if self._detection_future is None:
-            self.get_logger().info('_detections_ready: no future')
-            return False
+            return False  # remove the noisy log
         if not self._detection_future.done():
-            self.get_logger().info('_detections_ready: future not done yet')
-            return False
-        self.get_logger().info('_detections_ready: future done, processing...')
+            return False  # remove the noisy log
+        
         try:
             response = self._detection_future.result()
         except Exception as e:
@@ -226,6 +224,25 @@ class Rescue(LifecycleNode):
         if not response.success:
             self.get_logger().warn('Inference service returned success=False')
             return False
+
+        self.detected_objects = [
+            {
+                'type': t,
+                'bearing': b,
+                'confidence': c,
+                'distance': d,
+                'cx': x,
+            }
+            for t, b, c, d, x in zip(
+                response.type,
+                response.bearing,
+                response.confidence,
+                response.distance,
+                response.cx,
+            )
+        ]
+        self.get_logger().info(f'Detections ready: {len(self.detected_objects)} objects')
+        return True
 
         self.detected_objects = [
             {
