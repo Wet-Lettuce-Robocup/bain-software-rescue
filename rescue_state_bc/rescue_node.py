@@ -477,15 +477,21 @@ class Rescue(LifecycleNode):
         # search for the current target
         elif self.state == 3:
             if not getattr(self.move, 'busy', False):
+                self.get_logger().info(f'Searching for {self._current_target_type()} victim...')
                 self.current_target = self._current_target_type()
+                self.get_logger().info(f'Current target: {self.current_target}')
                 self._request_detections()
+                self.get_logger().info('Detection request sent, waiting for response...')
                 if self._detections_ready():
+                    self.get_logger().info('Detections ready, processing...')
                     target = self._find_target(self.current_target)
                     if target is not None:
+                        self.get_logger().info(f'{self.current_target} victim detected, aligning...')
                         self.target_type = self.current_target
                         self.target_detection = target
                         self.state = 5
                     else:
+                        self.get_logger().info(f'No {self.current_target} victim detected, rotating to search...')
                         self.move.drive(0, 180, -100)
                         self.state = 4
 
