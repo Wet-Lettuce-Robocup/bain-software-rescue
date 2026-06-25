@@ -321,15 +321,15 @@ class Rescue(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def _request_detections(self):
-        """Fire an async whereball request. No-op if one is already in flight."""
         if self._detection_future is not None and not self._detection_future.done():
             return  # previous call still in flight
+        self.get_logger().debug('Requesting detections from inference service...')
         req = Inference.Request()
         req.message = 'whereball'
         self._detection_future = self.ball_client.call_async(req)
+        self.get_logger().debug('Detection request sent to inference service')
 
     def _detections_ready(self):
-        """Returns True and updates detected_objects if the pending future is done."""
         if self._detection_future is None or not self._detection_future.done():
             return False
         try:
