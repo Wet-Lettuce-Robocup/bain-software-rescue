@@ -149,6 +149,7 @@ class Rescue(LifecycleNode):
     exit_kp = 0.5
     black_line_seen = False
     search_step = 0
+    rad_to_turn = 2
 
     def __init__(self):
         super().__init__('rescue_node')
@@ -257,6 +258,8 @@ class Rescue(LifecycleNode):
         try:
             self.claw_tof_distance = float(msg.data) / 1000.0
         except Exception:
+            self.get_logger().error('Failed to parse claw TOF distance, WHAT IS GOING ON BRUHHHH')
+            self.get_logger().error(f'Failed to parse claw TOF distance, msg: {msg} bruh')
             self.claw_tof_distance = float(getattr(msg, 'data', float('inf')))
         try:
             self.side_tof_distance = float(msg.data) / 1000.0
@@ -356,13 +359,13 @@ class Rescue(LifecycleNode):
             if self._detections_ready():
                 target = self._find_target(self.current_target)
                 if target is not None:
-                    self.get_logger().info(f'{self.current_target} victim detected, aligning...')
+                    self.get_logger().info(f'"{self.current_target}" detected, aligning...')
                     self.target_type = self.current_target
                     self.target_detection = target
                     self.state = 6
                 else:
                     self.search_step += 1
-                    self.get_logger().info(f'No {self.current_target} victim found, rotating...')
+                    self.get_logger().info(f'No "{self.current_target}" found, rotating...')
 
                     if self.silver_victims_collected >= 2:
                         max_steps = 4 
@@ -382,8 +385,26 @@ class Rescue(LifecycleNode):
         # align to target bearing using stored detection
         elif self.state == 6:
             bearing = self.target_detection['bearing']
-            self.move.drive(0, bearing, 100)
+            self.move.drive(0, bearing * self.rad_to_turn, 100)
             self.state = 7
+
+        elif self.state == 7:
+            if not getattr(self.move, 'busy', False):
+                distance = self.target_detection['distance']
+                self.move.drive(distance * self.m_to_dist, 0, 100)
+                self.state = 8
+
+        elif self.state == 8:
+            if not getattr(self.move, 'busy', False):
+                if self.target_type == 'silver' or self.target_type == 'black':
+                    self.get_logger().info(f'Victim "{self.target_type}", proceeding with collection')
+                    self.state = 9
+                elif self.target_type == 'green' or self.target_type == 'red':
+                    self.get_logger().info(f'Tray "{self.target_type}", approaching for deposit')
+                    self.state = 10
+                else:
+                    self.get_logger().error(f'Unknown target type: {self.target_type}, how did we get here??')
+                    self.state = 2
 
         # wait until close, then lower/open claw
         elif self.state == 7:
@@ -419,11 +440,14 @@ class Rescue(LifecycleNode):
                 self.target_type = None
                 self.target_detection = None
                 if self.silver_victims_collected >= 2 and self.black_victims_collected >= 1:
-                    self.get_logger().info('All victims collected, searching for exit...')
+                    self.get_logger().info('All victims collected')
+                    self.state = 11
                 self.state = 2
 
-        elif self.state == 99:
-            pass
+        # find trays
+        elif self.state == 11:
+            self.target_type = 'green'
+            self.state = 2
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
