@@ -221,6 +221,9 @@ class Rescue(LifecycleNode):
         # LED publisher will be created in on_configure
         self.led_cmd_pub = None
 
+        # inference future (async detection requests)
+        self._detection_future = None
+
 
 
     def on_configure(self, state):
@@ -317,21 +320,31 @@ class Rescue(LifecycleNode):
             self.control_timer = None
         return TransitionCallbackReturn.SUCCESS
 
-    def _get_detections(self):
+    def _request_detections(self):
+        """Fire an async whereball request. No-op if one is already in flight."""
+        if self._detection_future is not None and not self._detection_future.done():
+            return  # previous call still in flight
+        req = Inference.Request()
+        req.message = 'whereball'
+        self._detection_future = self.ball_client.call_async(req)
+
+    def _detections_ready(self):
+        """Returns True and updates detected_objects if the pending future is done."""
+        if self._detection_future is None or not self._detection_future.done():
+            return False
         try:
-            req = Inference.Request()
-            req.message = 'whereball'
-            self.get_logger().info('Requesting detections from inference service...')
-            response = self.ball_client.call(req)
+            response = self._detection_future.result()
         except Exception as e:
             self.get_logger().error(f'Inference service call failed: {e}')
-            return
+            self._detection_future = None
+            return False
+        self._detection_future = None
 
         if not response.success:
             self.get_logger().warn('Inference service returned success=False')
-            return
+            return False
 
-        # bearing is relative to the robot (0 = straight ahead), no angle offset needed
+        # bearing is relative to the robot (0 = straight ahead)
         self.detected_objects = [
             {
                 'type': t,
@@ -349,6 +362,7 @@ class Rescue(LifecycleNode):
             )
         ]
         self.get_logger().debug(f'Detections: {len(self.detected_objects)}')
+        return True
 
     def black_line_callback(self, msg):
         if msg.data:
@@ -457,24 +471,23 @@ class Rescue(LifecycleNode):
         # wait for drive in to finish then rotate right
         elif self.state == 2:
             if not getattr(self.move, 'busy', False):
-                self.get_logger().info('Drive in complete, rotating right')
-                self.move.drive(0, 250, 100)
+                self.move.drive(0, 180, 100)
                 self.state = 3
 
         # search for the current target
         elif self.state == 3:
             if not getattr(self.move, 'busy', False):
                 self.current_target = self._current_target_type()
-                self._get_detections()
-                self.get_logger().info(f'Searching for {self.current_target} victim')
-                target = self._find_target(self.current_target)
-                if target is not None:
-                    self.target_type = self.current_target
-                    self.target_detection = target
-                    self.state = 5
-                else:
-                    self.move.drive(0, 180, -100)
-                    self.state = 4
+                self._request_detections()
+                if self._detections_ready():
+                    target = self._find_target(self.current_target)
+                    if target is not None:
+                        self.target_type = self.current_target
+                        self.target_detection = target
+                        self.state = 5
+                    else:
+                        self.move.drive(0, 180, -100)
+                        self.state = 4
 
         # keep scanning by rotating left, then go back to search
         elif self.state == 4:
@@ -483,24 +496,8 @@ class Rescue(LifecycleNode):
 
         # align to target bearing
         elif self.state == 5:
-            self._get_detections()
-            target = self._find_target(self.target_type)
-            if target is None:
-                self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
-                self.state = 3
-            else:
-                bearing = target['bearing']
-                if abs(bearing) < 0.2:
-                    # already aligned, go straight to approach
-                    self.state = 6
-                else:
-                    self.move.drive(0, bearing, 100)
-                    self.state = 6
-
-        # wait for alignment, then approach target
-        elif self.state == 6:
-            if not getattr(self.move, 'busy', False):
-                self._get_detections()
+            self._request_detections()
+            if self._detections_ready():
                 target = self._find_target(self.target_type)
                 if target is None:
                     self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
@@ -508,11 +505,29 @@ class Rescue(LifecycleNode):
                 else:
                     bearing = target['bearing']
                     if abs(bearing) < 0.2:
-                        distance = target['distance']
-                        self.move.drive(0.2, distance - 10, 100)
-                        self.state = 7
+                        # already aligned, go straight to approach
+                        self.state = 6
                     else:
-                        self.state = 5
+                        self.move.drive(0, bearing, 100)
+                        self.state = 6
+
+        # wait for alignment, then approach target
+        elif self.state == 6:
+            if not getattr(self.move, 'busy', False):
+                self._request_detections()
+                if self._detections_ready():
+                    target = self._find_target(self.target_type)
+                    if target is None:
+                        self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
+                        self.state = 3
+                    else:
+                        bearing = target['bearing']
+                        if abs(bearing) < 0.2:
+                            distance = target['distance']
+                            self.move.drive(0.2, distance - 10, 100)
+                            self.state = 7
+                        else:
+                            self.state = 5
 
         # wait until close, then lower/open claw
         elif self.state == 7:
