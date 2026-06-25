@@ -167,9 +167,9 @@ class Rescue(LifecycleNode):
     def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
         self.move = Movement(self)
-        self.front_tof_subscriber = self.create_subscription(Int32, '/tof_front', self.laser_scan_callback, 10)
-        self.claw_tof_subscriber = self.create_subscription(Int32, '/tof_claw', self.laser_scan_callback, 10)
-        self.side_tof_subscriber = self.create_subscription(Int32, '/tof_side', self.laser_scan_callback, 10)
+        self.front_tof_subscriber = self.create_subscription(Int32, '/tof_front', self.front_tof_callback, 10)
+        self.claw_tof_subscriber = self.create_subscription(Int32, '/tof_claw', self.claw_tof_callback, 10)
+        self.side_tof_subscriber = self.create_subscription(Int32, '/tof_side', self.side_tof_callback, 10)
         self.black_line_subscriber = self.create_subscription(Bool, '/black_present', self.black_line_callback, 10)
 
         self.ball_client = self.create_client(Inference, '/ml_rescue/detections')
@@ -250,17 +250,21 @@ class Rescue(LifecycleNode):
         if msg.data:
             self.black_line_seen = True
 
-    def laser_scan_callback(self, msg):
+    def front_tof_callback(self, msg):
         try:
             self.front_tof_distance = float(msg.data) / 1000.0
         except Exception:
             self.front_tof_distance = 999999
+
+    def claw_tof_callback(self, msg):
         try:
             self.claw_tof_distance = float(msg.data) / 1000.0
         except Exception:
             self.get_logger().error('Failed to parse claw TOF distance, WHAT IS GOING ON BRUHHHH')
             self.get_logger().error(f'Failed to parse claw TOF distance, msg: {msg} bruh')
             self.claw_tof_distance = 999999
+
+    def side_tof_callback(self, msg):
         try:
             self.side_tof_distance = float(msg.data) / 1000.0
         except Exception:
