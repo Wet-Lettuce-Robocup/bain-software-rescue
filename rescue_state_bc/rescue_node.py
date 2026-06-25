@@ -458,7 +458,7 @@ class Rescue(LifecycleNode):
         elif self.state == 2:
             if not getattr(self.move, 'busy', False):
                 self.get_logger().info('Drive in complete, rotating right')
-                self.move.drive(0, 180, 100)
+                self.move.drive(0, 250, 100)
                 self.state = 3
 
         # search for the current target
