@@ -254,17 +254,17 @@ class Rescue(LifecycleNode):
         try:
             self.front_tof_distance = float(msg.data) / 1000.0
         except Exception:
-            self.front_tof_distance = float(getattr(msg, 'data', float('inf')))
+            self.front_tof_distance = 999999
         try:
             self.claw_tof_distance = float(msg.data) / 1000.0
         except Exception:
             self.get_logger().error('Failed to parse claw TOF distance, WHAT IS GOING ON BRUHHHH')
             self.get_logger().error(f'Failed to parse claw TOF distance, msg: {msg} bruh')
-            self.claw_tof_distance = float(getattr(msg, 'data', float('inf')))
+            self.claw_tof_distance = 999999
         try:
             self.side_tof_distance = float(msg.data) / 1000.0
         except Exception:
-            self.side_tof_distance = float(getattr(msg, 'data', float('inf')))
+            self.side_tof_distance = 999999
 
     def face_bearing(self, bearing: float, rotate_vel=0.1):
         current = self.move.current_angle
