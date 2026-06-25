@@ -301,7 +301,7 @@ class Rescue(LifecycleNode):
         except Exception as e:
             self.get_logger().error(f'Failed to publish LEDCommand: {e}')
 
-        def publish_cmd_vel(self, linear_x=0.0, angular_z=0.0):
+    def publish_cmd_vel(self, linear_x=0.0, angular_z=0.0):
             if self.cmd_vel_pub is None:
                 return
             twist = Twist()
