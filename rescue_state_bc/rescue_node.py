@@ -318,10 +318,10 @@ class Rescue(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def _get_detections(self):
-        """Blocking call to the Inference service; updates detected_objects with relative bearings."""
         try:
             req = Inference.Request()
             req.message = 'whereball'
+            self.get_logger().info('Requesting detections from inference service...')
             response = self.ball_client.call(req)
         except Exception as e:
             self.get_logger().error(f'Inference service call failed: {e}')
@@ -465,6 +465,7 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.current_target = self._current_target_type()
                 self._get_detections()
+                self.get_logger().info(f'Searching for {self.current_target} victim')
                 target = self._find_target(self.current_target)
                 if target is not None:
                     self.target_type = self.current_target
