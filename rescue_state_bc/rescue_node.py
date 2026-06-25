@@ -321,7 +321,7 @@ class Rescue(LifecycleNode):
         return TransitionCallbackReturn.SUCCESS
 
     def _request_detections(self):
-        if self._detection_future is not None and not self._detection_future.done():
+        if self._detection_future is not None:
             return  # previous call still in flight
         self.get_logger().debug('Requesting detections from inference service...')
         req = Inference.Request()
