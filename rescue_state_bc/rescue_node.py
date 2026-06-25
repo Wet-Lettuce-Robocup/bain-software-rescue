@@ -346,27 +346,28 @@ class Rescue(LifecycleNode):
                 if self._detection_future is None:
                     self.current_target = self._current_target_type()
                     self._request_detections()
-                    return
-                if self._detections_ready():
-                    target = self._find_target(self.current_target)
-                    if target is not None:
-                        self.get_logger().info(f'{self.current_target} victim detected, aligning...')
-                        self.target_type = self.current_target
-                        self.target_detection = target
-                        self.state = 5
-                    else:
-                        self.get_logger().info(f'No {self.current_target} victim found, rotating...')
-                        self.move.drive(0, 180, -100)
-                        self.state = 4
-
+                    self.state = 4
+        
+        elif self.state == 4:
+            if self._detections_ready():
+                target = self._find_target(self.current_target)
+                if target is not None:
+                    self.get_logger().info(f'{self.current_target} victim detected, aligning...')
+                    self.target_type = self.current_target
+                    self.target_detection = target
+                    self.state = 6
+                else:
+                    self.get_logger().info(f'No {self.current_target} victim found, rotating...')
+                    self.move.drive(0, 180, -100)
+                    self.state = 5
 
         # keep scanning by rotating left, then go back to search
-        elif self.state == 4:
+        elif self.state == 5:
             if not getattr(self.move, 'busy', False):
                 self.state = 3
 
         # align to target bearing
-        elif self.state == 5:
+        elif self.state == 6:
             self._request_detections()
             if self._detections_ready():
                 target = self._find_target(self.target_type)
@@ -377,13 +378,13 @@ class Rescue(LifecycleNode):
                     bearing = target['bearing']
                     if abs(bearing) < 0.2:
                         # already aligned, go straight to approach
-                        self.state = 6
+                        self.state = 7
                     else:
                         self.move.drive(0, bearing, 100)
-                        self.state = 6
+                        self.state = 7
 
         # wait for alignment, then approach target
-        elif self.state == 6:
+        elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 self._request_detections()
                 if self._detections_ready():
@@ -395,25 +396,25 @@ class Rescue(LifecycleNode):
                         bearing = target['bearing']
                         if abs(bearing) < 0.2:
                             self.move.drive(0.2, target['distance'] - 10, 100)
-                            self.state = 7
+                            self.state = 8
                         else:
-                            self.state = 5
+                            self.state = 6
 
         # wait until close, then lower/open claw
-        elif self.state == 7:
+        elif self.state == 8:
             if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
-                self.state = 8
+                self.state = 9
 
         # when claw is close enough, stop and close claw
-        elif self.state == 8:
+        elif self.state == 9:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(100, 0, -100)  # pull victim back
-                self.state = 9
+                self.state = 10
 
         # wait for pull-back to finish, then count victim and return to search
-        elif self.state == 9:
+        elif self.state == 10:
             if not getattr(self.move, 'busy', False):
                 if self.target_type == 'silver':
                     self.silver_victims_collected += 1
