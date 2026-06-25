@@ -221,8 +221,7 @@ class Rescue(LifecycleNode):
         # LED publisher will be created in on_configure
         self.led_cmd_pub = None
 
-        # inference service call state
-        self._inference_pending = False
+
 
     def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
@@ -318,31 +317,25 @@ class Rescue(LifecycleNode):
             self.control_timer = None
         return TransitionCallbackReturn.SUCCESS
 
-    def _request_detections(self):
-        if self._inference_pending:
-            return  # don't stack calls while one is in flight
-
-        self._inference_pending = True
-        req = Inference.Request()
-        future = self.ball_client.call_async(req)
-        future.add_done_callback(self._inference_response_callback)
-
-    def _inference_response_callback(self, future):
-        self._inference_pending = False
+    def _get_detections(self):
+        """Blocking call to the Inference service; updates detected_objects with relative bearings."""
         try:
-            response = future.result()
+            req = Inference.Request()
+            req.message = 'whereball'
+            response = self.ball_client.call(req)
         except Exception as e:
             self.get_logger().error(f'Inference service call failed: {e}')
             return
 
         if not response.success:
+            self.get_logger().warn('Inference service returned success=False')
             return
 
-        # rebuild detected_objects by zipping the parallel response arrays
+        # bearing is relative to the robot (0 = straight ahead), no angle offset needed
         self.detected_objects = [
             {
                 'type': t,
-                'bearing': b + float(self.move.current_angle),
+                'bearing': b,
                 'confidence': c,
                 'distance': d,
                 'cx': x,
@@ -355,8 +348,7 @@ class Rescue(LifecycleNode):
                 response.cx,
             )
         ]
-
-        self.get_logger().debug(f'Inference response: {len(self.detected_objects)} detections')
+        self.get_logger().debug(f'Detections: {len(self.detected_objects)}')
 
     def black_line_callback(self, msg):
         if msg.data:
@@ -457,10 +449,6 @@ class Rescue(LifecycleNode):
                 self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
             self._last_state = self.state
 
-        # poll the inference service every control tick to keep detected_objects fresh
-        self._request_detections()
-        self.current_target = self._current_target_type()
-
         # move in
         if self.state == 1:
                 self.move.drive(140, 0, 100)
@@ -475,6 +463,8 @@ class Rescue(LifecycleNode):
         # search for the current target
         elif self.state == 3:
             if not getattr(self.move, 'busy', False):
+                self.current_target = self._current_target_type()
+                self._get_detections()
                 target = self._find_target(self.current_target)
                 if target is not None:
                     self.target_type = self.current_target
@@ -491,18 +481,24 @@ class Rescue(LifecycleNode):
 
         # align to target bearing
         elif self.state == 5:
+            self._get_detections()
             target = self._find_target(self.target_type)
             if target is None:
                 self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
                 self.state = 3
             else:
                 bearing = target['bearing']
-                self.move.drive(0, bearing, 100)
-                self.state = 6
+                if abs(bearing) < 0.2:
+                    # already aligned, go straight to approach
+                    self.state = 6
+                else:
+                    self.move.drive(0, bearing, 100)
+                    self.state = 6
 
         # wait for alignment, then approach target
         elif self.state == 6:
             if not getattr(self.move, 'busy', False):
+                self._get_detections()
                 target = self._find_target(self.target_type)
                 if target is None:
                     self.get_logger().warn(f'{self.target_type} victim disappeared, returning to search')
@@ -541,9 +537,9 @@ class Rescue(LifecycleNode):
                 self.target_detection = None
 
                 if self.silver_victims_collected < 2:
-                    self.state = 3
+                    self.state = 3  # collect next silver
                 else:
-                    self.state = 3
+                    self.state = 100  # all silvers done, head for exit
 
         elif self.state == 99:
             # rotate toward black victim
