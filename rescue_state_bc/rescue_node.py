@@ -168,9 +168,9 @@ class Rescue(LifecycleNode):
     def on_configure(self, state):
         self.get_logger().info('Configuring Rescue Node...')
         self.move = Movement(self)
-        self.front_tof_subscriber = self.create_subscription(Int32, '/tof_front', self.front_tof_callback, 10)
-        self.claw_tof_subscriber = self.create_subscription(Int32, '/tof_claw', self.claw_tof_callback, 10)
-        self.side_tof_subscriber = self.create_subscription(Int32, '/tof_side', self.side_tof_callback, 10)
+        self.front_tof_subscriber = self.create_subscription(Int32, '/tof/front', self.front_tof_callback, 10)
+        self.claw_tof_subscriber = self.create_subscription(Int32, '/tof/claw', self.claw_tof_callback, 10)
+        self.side_tof_subscriber = self.create_subscription(Int32, '/tof/side', self.side_tof_callback, 10)
         self.black_line_subscriber = self.create_subscription(Bool, '/black_present', self.black_line_callback, 10)
 
         self.ball_client = self.create_client(Inference, '/ml_rescue/detections')
@@ -329,17 +329,35 @@ class Rescue(LifecycleNode):
     def _current_target_type(self):
         return 'silver' if self.silver_victims_collected < 2 else 'black'
     
+    def _wait(self, duration, next_state):
+        self.get_logger().info(f'Waiting for {duration} seconds before transitioning to state {next_state}')
+        self.wait_until = self.get_clock().now() + rclpy.duration.Duration(seconds=duration)
+        self.next_state_after_wait = next_state
+        self.state = 99
+    
     def lift(self, position):
         if position == 'up':
+            self.get_logger().info('Lift raised')
             self.lift_pub.publish(Float32(data=2.5))
         elif position == 'down':
+            self.get_logger().info('Lift lowered')
             self.lift_pub.publish(Float32(data=0.2))
     
     def grab(self, position):
         if position == 'open':
+            self.get_logger().info('Claw opened')
             self.claw_pub.publish(Float32(data=0.5))
-        elif position == 'closed':
+        elif position == 'close':
+            self.get_logger().info('Claw closed')
             self.claw_pub.publish(Float32(data=1.0))
+
+    def gate(self, position):
+        if position == 'open':
+            self.get_logger().info('Gate opened')
+            self.gate_pub.publish(Float32(data=1.0)) # UPDATE
+        elif position == 'close':
+            self.get_logger().info('Gate closed')
+            self.gate_pub.publish(Float32(data=0.0)) # UPDATE
 
     def rescue_control_loop(self):
         if getattr(self, '_last_state', None) != self.state:
@@ -441,7 +459,7 @@ class Rescue(LifecycleNode):
         elif self.state == 10:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
-                self.grab('closed')
+                self.grab('close')
                 self.move.drive(100, 0, -100)  # pull victim back
                 self.state = 11
 
@@ -507,8 +525,13 @@ class Rescue(LifecycleNode):
 
         elif self.state == 16:
             if not getattr(self.move, 'busy', False):
-                #self.gate('open')
-                pass
+                self.gate('open')
+                self.wait(3, 17)
+
+        elif self.state == 17:
+            if not getattr(self.move, 'busy', False):
+                self.gate('close')
+                self.state = 1
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
@@ -530,9 +553,11 @@ class Rescue(LifecycleNode):
                     self.move.drive(100, 0, 100) # drive out of exit
                     self.state = 102
 
-        elif self.state == 102:
-            pass
-
+        elif self.state == 99:
+            if getattr(self, 'wait_until', None) is not None and self.get_clock().now() >= self.wait_until:
+                self.state = self.next_state_after_wait
+                self.wait_until = None
+                self.next_state_after_wait = None
 
 def main(args=None):
     rclpy.init(args=args)
