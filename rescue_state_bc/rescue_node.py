@@ -265,6 +265,8 @@ class Rescue(LifecycleNode):
             self.get_logger().error(f'Failed to parse claw TOF distance, msg: {msg} bruh')
             self.claw_tof_distance = 999999
 
+        self.get_logger().info(f'Claw TOF distance: {self.claw_tof_distance:.3f} m')
+
     def side_tof_callback(self, msg):
         try:
             self.side_tof_distance = float(msg.data) / 1000.0
