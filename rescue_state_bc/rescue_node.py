@@ -149,7 +149,7 @@ class Rescue(LifecycleNode):
     exit_kp = 0.5
     black_line_seen = False
     search_step = 0
-    rad_to_turn = 2
+    rad_to_turn = 200
     m_to_dist = 700
 
     def __init__(self):
