@@ -331,15 +331,15 @@ class Rescue(LifecycleNode):
     
     def lift(self, position):
         if position == 'up':
-            self.lift_pub.publish(float(2.5))
+            self.lift_pub.publish(Float32(data=2.5))
         elif position == 'down':
-            self.lift_pub.publish(float(0.2))
+            self.lift_pub.publish(Float32(data=0.2))
     
     def grab(self, position):
         if position == 'open':
-            self.claw_pub.publish(float(0.5))
+            self.claw_pub.publish(Float32(data=0.5))
         elif position == 'closed':
-            self.claw_pub.publish(float(1.0))
+            self.claw_pub.publish(Float32(data=1.0))
 
     def rescue_control_loop(self):
         if getattr(self, '_last_state', None) != self.state:
