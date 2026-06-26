@@ -177,7 +177,6 @@ class Rescue(LifecycleNode):
 
         self.front_vision_enable_pub = self.create_publisher(Bool, '/front_vision_enable', 10)
         self.down_vision_enable_pub = self.create_publisher(Bool, '/down_vision_enable', 10)
-        self.fan_pub = self.create_publisher(Int32, '/fan_speed', 10)
         self.drive_pub = self.create_publisher(Int32, '/drive_command', 10)
         self.scan_pub = self.create_publisher(LaserScan, '/scan', 10)
         self.led_cmd_pub = self.create_publisher(LEDCommand, 'led_command', 10)
