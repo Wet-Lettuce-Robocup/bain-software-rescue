@@ -182,6 +182,8 @@ class Rescue(LifecycleNode):
         self.scan_pub = self.create_publisher(LaserScan, '/scan', 10)
         self.led_cmd_pub = self.create_publisher(LEDCommand, 'led_command', 10)
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
+        self.claw_pub = self.create_publisher(Int32, '/servo/claw', 10) # 0.5 is open, 1 is closed
+        self.lift_pub = self.create_publisher(Int32, '/servo/lift', 10) # up is 2.5, down is 0.2
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -326,6 +328,18 @@ class Rescue(LifecycleNode):
 
     def _current_target_type(self):
         return 'silver' if self.silver_victims_collected < 2 else 'black'
+    
+    def lift(self, position):
+        if position == 'up':
+            self.lift_pub.publish(float(2.5))
+        elif position == 'down':
+            self.lift_pub.publish(float(0.2))
+    
+    def grab(self, position):
+        if position == 'open':
+            self.claw_pub.publish(float(0.5))
+        elif position == 'closed':
+            self.claw_pub.publish(float(1.0))
 
     def rescue_control_loop(self):
         if getattr(self, '_last_state', None) != self.state:
@@ -393,12 +407,14 @@ class Rescue(LifecycleNode):
         elif self.state == 6:
             bearing = self.target_detection['bearing']
             self.move.drive(0, bearing * self.rad_to_turn, 100)
+            self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
             self.state = 7
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
                 self.move.drive(distance * self.m_to_dist, 0, 100)
+                self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
                 self.state = 8
 
         elif self.state == 8:
@@ -415,8 +431,8 @@ class Rescue(LifecycleNode):
 
         # wait until close, then lower/open claw
         elif self.state == 7:
-            # claw down
-            # claw open
+            self.lift('down')
+            self.grab('open')
             if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
                 self.state = 8
@@ -425,16 +441,15 @@ class Rescue(LifecycleNode):
         elif self.state == 8:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
-                # claw close
+                self.grab('closed')
                 self.move.drive(100, 0, -100)  # pull victim back
                 self.state = 9
 
         elif self.state == 9:
             if not getattr(self.move, 'busy', False):
-                # claw up
+                self.lift('up')
                 if self.target_type == 'silver':
-                    # claw open
-                    pass #remove
+                    self.grab('open')
                 self.state = 10
 
         # count victim and return to search
