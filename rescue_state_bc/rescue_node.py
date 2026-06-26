@@ -424,28 +424,28 @@ class Rescue(LifecycleNode):
                     self.state = 9
                 elif self.target_type == 'green' or self.target_type == 'red':
                     self.get_logger().info(f'Tray "{self.target_type}", approaching for deposit')
-                    self.state = 10
+                    self.state = 12
                 else:
                     self.get_logger().error(f'Unknown target type: {self.target_type}, how did we get here??')
                     self.state = 2
 
         # wait until close, then lower/open claw
-        elif self.state == 7:
+        elif self.state == 9:
             self.lift('down')
             self.grab('open')
             if not getattr(self.move, 'busy', False):
                 self.publish_cmd_vel(50, 20)
-                self.state = 8
+                self.state = 10
 
         # when claw is close enough stop
-        elif self.state == 8:
+        elif self.state == 10:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
                 self.grab('closed')
                 self.move.drive(100, 0, -100)  # pull victim back
-                self.state = 9
+                self.state = 11
 
-        elif self.state == 9:
+        elif self.state == 11:
             if not getattr(self.move, 'busy', False):
                 self.lift('up')
                 if self.target_type == 'silver':
@@ -455,21 +455,60 @@ class Rescue(LifecycleNode):
         # count victim and return to search
         elif self.state == 10:
             if not getattr(self.move, 'busy', False):
+
                 if self.target_type == 'silver':
                     self.silver_victims_collected += 1
                 else:
                     self.black_victims_collected += 1
+
                 self.target_type = None
                 self.target_detection = None
+
                 if self.silver_victims_collected >= 2 and self.black_victims_collected >= 1:
                     self.get_logger().info('All victims collected')
                     self.state = 11
-                self.state = 2
+                else:
+                    self.state = 2
 
         # find trays
         elif self.state == 11:
             self.target_type = 'green'
             self.state = 2
+
+        elif self.state == 12:
+            if self.target_type == 'green':
+                self.publish_cmd_vel(50, 0)
+                if True: # WHEN CAMERA IS FULL GREEN
+                    self.publish_cmd_vel(0, 0)
+                    self.lift('up')
+                    self.state = 13
+            elif self.target_type == 'red':
+                self.publish_cmd_vel(50, 0)
+                self.grab('open')
+                if True: # WHEN CAMERA IS FULL RED
+                    self.publish_cmd_vel(0, 0)
+                    self.lift('up')
+                    self.state = 13
+
+        elif self.state == 13:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(100, 0, -100)  # back up from tray
+                self.state = 14
+
+        elif self.state == 14:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(0, 350, 100) 
+                self.state = 15
+
+        elif self.state == 15:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(100, 0, -100)
+                self.state = 16
+
+        elif self.state == 16:
+            if not getattr(self.move, 'busy', False):
+                #self.gate('open')
+                pass
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
