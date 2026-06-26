@@ -442,7 +442,7 @@ class Rescue(LifecycleNode):
                     self.state = 9
                 elif self.target_type == 'green' or self.target_type == 'red':
                     self.get_logger().info(f'Tray "{self.target_type}", approaching for deposit')
-                    self.state = 12
+                    self.state = 15
                 else:
                     self.get_logger().error(f'Unknown target type: {self.target_type}, how did we get here??')
                     self.state = 2
@@ -459,19 +459,23 @@ class Rescue(LifecycleNode):
         elif self.state == 10:
             if self.claw_tof_distance < 30:
                 self.publish_cmd_vel(0, 0)
-                self.grab('close')
-                self.move.drive(100, 0, -100)  # pull victim back
+                self.move.drive(50, 0, 50)
                 self.state = 11
 
         elif self.state == 11:
+                self.grab('close')
+                self.move.drive(100, 0, -100)  # pull victim back
+                self.state = 12
+
+        elif self.state == 12:
             if not getattr(self.move, 'busy', False):
                 self.lift('up')
                 if self.target_type == 'silver':
                     self.grab('open')
-                self.state = 10
+                self.state = 13
 
         # count victim and return to search
-        elif self.state == 10:
+        elif self.state == 13:
             if not getattr(self.move, 'busy', False):
 
                 if self.target_type == 'silver':
@@ -484,51 +488,51 @@ class Rescue(LifecycleNode):
 
                 if self.silver_victims_collected >= 2 and self.black_victims_collected >= 1:
                     self.get_logger().info('All victims collected')
-                    self.state = 11
+                    self.state = 14
                 else:
                     self.state = 2
 
         # find trays
-        elif self.state == 11:
+        elif self.state == 14:
             self.target_type = 'green'
             self.state = 2
 
-        elif self.state == 12:
+        elif self.state == 15:
             if self.target_type == 'green':
                 self.publish_cmd_vel(50, 0)
                 if True: # WHEN CAMERA IS FULL GREEN
                     self.publish_cmd_vel(0, 0)
                     self.lift('up')
-                    self.state = 13
+                    self.state = 16
             elif self.target_type == 'red':
                 self.publish_cmd_vel(50, 0)
                 self.grab('open')
                 if True: # WHEN CAMERA IS FULL RED
                     self.publish_cmd_vel(0, 0)
                     self.lift('up')
-                    self.state = 13
-
-        elif self.state == 13:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(100, 0, -100)  # back up from tray
-                self.state = 14
-
-        elif self.state == 14:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(0, 350, 100) 
-                self.state = 15
-
-        elif self.state == 15:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(100, 0, -100)
-                self.state = 16
+                    self.state = 16
 
         elif self.state == 16:
             if not getattr(self.move, 'busy', False):
-                self.gate('open')
-                self.wait(3, 17)
+                self.move.drive(100, 0, -100)  # back up from tray
+                self.state = 17
 
         elif self.state == 17:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(0, 350, 100) 
+                self.state = 18
+
+        elif self.state == 18:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(100, 0, -100)
+                self.state = 19
+
+        elif self.state == 19:
+            if not getattr(self.move, 'busy', False):
+                self.gate('open')
+                self.wait(3, 20)
+
+        elif self.state == 20:
             if not getattr(self.move, 'busy', False):
                 self.gate('close')
                 self.state = 1
