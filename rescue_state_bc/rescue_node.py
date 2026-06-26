@@ -224,7 +224,7 @@ class Rescue(LifecycleNode):
         self._detection_future = None
 
         if not response.success:
-            self.get_logger().log('Inference service returned nothing')
+            self.get_logger().info('Inference service returned nothing')
             self.detected_objects = []
             return True
 
