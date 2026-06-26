@@ -430,7 +430,7 @@ class Rescue(LifecycleNode):
         elif self.state == 9:
             if not getattr(self.move, 'busy', False):
                 # claw up
-                if self.tartget_type == 'silver':
+                if self.target_type == 'silver':
                     # claw open
                     pass #remove
                 self.state = 10
