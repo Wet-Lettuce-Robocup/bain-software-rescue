@@ -426,14 +426,14 @@ class Rescue(LifecycleNode):
             bearing = self.target_detection['bearing']
             self.move.drive(0, bearing * self.rad_to_turn, 100)
             self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
-            self.wait(3, 7)
+            self._wait(3, 7)
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
                 self.move.drive(distance * self.m_to_dist, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
-                self.wait(5, 8)
+                self._wait(5, 8)
 
         elif self.state == 8:
             if not getattr(self.move, 'busy', False):
@@ -468,7 +468,7 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.grab('close')
                 self.move.drive(100, 0, -100)  # pull victim back
-                self.wait(2, 12)
+                self._wait(2, 12)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
