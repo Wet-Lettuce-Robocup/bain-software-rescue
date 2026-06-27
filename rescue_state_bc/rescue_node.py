@@ -353,10 +353,10 @@ class Rescue(LifecycleNode):
     def gate(self, position):
         if position == 'open':
             self.get_logger().info('Gate opened')
-            self.gate_pub.publish(Float32(data=1.0)) # UPDATE
+            self.gate_pub.publish(Float32(data=2.3))
         elif position == 'close':
             self.get_logger().info('Gate closed')
-            self.gate_pub.publish(Float32(data=0.0)) # UPDATE
+            self.gate_pub.publish(Float32(data=0.8)) # UPDATE
 
     def rescue_control_loop(self):
         if getattr(self, '_last_state', None) != self.state:
@@ -425,14 +425,14 @@ class Rescue(LifecycleNode):
             bearing = self.target_detection['bearing']
             self.move.drive(0, bearing * self.rad_to_turn, 100)
             self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
-            self.state = 7
+            self.wait(3, 7)
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
                 self.move.drive(distance * self.m_to_dist, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
-                self.state = 8
+                self.wait(5, 8)
 
         elif self.state == 8:
             if not getattr(self.move, 'busy', False):
@@ -535,6 +535,11 @@ class Rescue(LifecycleNode):
                 self.wait(3, 20)
 
         elif self.state == 20:
+            if not getattr(self.move, 'busy', False):
+                self.move.drive(50, 0, 100)
+                self.state = 21
+
+        elif self.state == 21:
             if not getattr(self.move, 'busy', False):
                 self.gate('close')
                 self.state = 1
