@@ -391,7 +391,7 @@ class Rescue(LifecycleNode):
                     self.move.drive(0, 180, -100)
                 elif self.search_step == 3: # back  
                     self.move.drive(0, 180, -100)
-                self.state = 3
+                _wait(2, 5)
 
       # search for the current target
         elif self.state == 3:
@@ -460,7 +460,7 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(0.1, 0.05)
+                self.publish_cmd_vel(1, 0.5)
                 self.state = 10
 
         # when claw is close enough stop
@@ -468,7 +468,7 @@ class Rescue(LifecycleNode):
             self.get_logger().info(f'Claw TOF distance: {self.claw_tof_distance:.3f} m')
             if self.claw_tof_distance < 0.03 and self.claw_tof_distance > 0.01:
                 self.publish_cmd_vel(0, 0)
-                self.move.drive(50, 0, 50)
+                self.move.drive(30, 0, 50)
                 self.state = 11
 
         elif self.state == 11:
