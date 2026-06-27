@@ -589,14 +589,14 @@ class Rescue(LifecycleNode):
         elif self.state == 15:
             if self.target_type == 'green':
                 self.publish_cmd_vel(50, 0)
-                if True: # WHEN CAMERA IS FULL GREEN
+                if True: # WHEN CAMERA IS FULL GREEN CHANGE THIS
                     self.publish_cmd_vel(0, 0)
                     self.lift('up')
                     self.state = 16
             elif self.target_type == 'red':
                 self.publish_cmd_vel(50, 0)
                 self.grab('open')
-                if True: # WHEN CAMERA IS FULL RED
+                if True: # WHEN CAMERA IS FULL RED CHANGE THiS
                     self.publish_cmd_vel(0, 0)
                     self.lift('up')
                     self.state = 16
@@ -608,28 +608,34 @@ class Rescue(LifecycleNode):
 
         elif self.state == 17:
             if not getattr(self.move, 'busy', False):
-                self.move.drive(0, 350, 100) 
+                self.move.drive(0, 400, 100) # 360 such that back faces tray
                 self.state = 18
 
         elif self.state == 18:
             if not getattr(self.move, 'busy', False):
-                self.move.drive(100, 0, -100)
+                self.move.drive(100, 0, -100) # reverse into tray
                 self.state = 19
 
         elif self.state == 19:
             if not getattr(self.move, 'busy', False):
-                self.gate('open')
+                self.gate('open') # release victims
                 self.wait(3, 20)
 
-        elif self.state == 20:
+        elif self.state == 20: 
             if not getattr(self.move, 'busy', False):
-                self.move.drive(50, 0, 100)
+                self.move.drive(50, 0, 100) # move away from tray incase it climbs tray
                 self.state = 21
 
         elif self.state == 21:
             if not getattr(self.move, 'busy', False):
                 self.gate('close')
-                self.state = 1
+                self.target_type = 'red' # next going to red to drop black victim
+                self._wait(3, 22) # delay: make sure gate is closed
+
+        elif self.state == 22:
+            if not getattr(self.move, 'busy', False):
+                self.grab('open')
+                self.wait(2, 1) # delay: make sure ball can be release from claw before it shuts again in state 1
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
