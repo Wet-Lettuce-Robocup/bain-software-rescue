@@ -402,27 +402,28 @@ class Rescue(LifecycleNode):
                     self.state = 4
 
         elif self.state == 4:
-            if self._detections_ready():
-                target = self._find_target(self.current_target)
-                if target is not None:
-                    self.get_logger().info(f'"{self.current_target}" detected after "{self.turns}" turns, aligning...')
-                    self.target_type = self.current_target
-                    self.target_detection = target
-                    self.state = 6
-                else:
-                    self.search_step += 1
-                    self.get_logger().info(f'No "{self.current_target}" found, rotating...')
-
-                    if self.silver_victims_collected >= 2:
-                        max_steps = 4 
+            if not getattr(self.move, 'busy', False):
+                if self._detections_ready():
+                    target = self._find_target(self.current_target)
+                    if target is not None:
+                        self.get_logger().info(f'"{self.current_target}" detected after "{self.turns}" turns, aligning...')
+                        self.target_type = self.current_target
+                        self.target_detection = target
+                        self.state = 6
                     else:
-                        max_steps = 3
+                        self.search_step += 1
+                        self.get_logger().info(f'No "{self.current_target}" found, rotating...')
+
+                        if self.silver_victims_collected >= 2:
+                            max_steps = 4 
+                        else:
+                            max_steps = 3
+                            
+                        if self.search_step >= max_steps:
+                            self.search_step = 0 # loop back to 0 after reaching end of cycle
+                            self.move.drive(0, 180, 100)
                         
-                    if self.search_step >= max_steps:
-                        self.search_step = 0 # loop back to 0 after reaching end of cycle
-                        self.move.drive(0, 180, 100)
-                    
-                    self.state = 2
+                        self.state = 2
 
         elif self.state == 5:
             if not getattr(self.move, 'busy', False):
@@ -430,10 +431,11 @@ class Rescue(LifecycleNode):
 
         # align to target bearing using stored detection
         elif self.state == 6:
-            bearing = self.target_detection['bearing']
-            self.move.drive(0, bearing * self.rad_to_turn, 100)
-            self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
-            self._wait(3, 7)
+            if not getattr(self.move, 'busy', False):
+                bearing = self.target_detection['bearing']
+                self.move.drive(0, bearing * self.rad_to_turn, 100)
+                self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
+                self._wait(3, 7)
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
