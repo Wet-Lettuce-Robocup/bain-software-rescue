@@ -370,6 +370,8 @@ class Rescue(LifecycleNode):
         if self.state == 1:
             self.move.drive(140, 0, 100)
             self.grab('open')
+            self.grab('close')
+            self.lift('up')
             self.state = 2
 
         # wait for drive in to finish then rotate right
