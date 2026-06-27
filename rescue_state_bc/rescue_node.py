@@ -603,7 +603,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 16:
             if not getattr(self.move, 'busy', False):
-                self.move.drive(100, 0, -100)  # back up from tray
+                self.move.drive(-100, 0, 100)  # back up from tray
                 self.state = 17
 
         elif self.state == 17:
@@ -613,13 +613,13 @@ class Rescue(LifecycleNode):
 
         elif self.state == 18:
             if not getattr(self.move, 'busy', False):
-                self.move.drive(100, 0, -100) # reverse into tray
+                self.move.drive(-100, 0, 100) # reverse into tray
                 self.state = 19
 
         elif self.state == 19:
             if not getattr(self.move, 'busy', False):
                 self.gate('open') # release victims
-                self.wait(3, 20)
+                self._wait(3, 20)
 
         elif self.state == 20: 
             if not getattr(self.move, 'busy', False):
@@ -635,7 +635,7 @@ class Rescue(LifecycleNode):
         elif self.state == 22:
             if not getattr(self.move, 'busy', False):
                 self.grab('open')
-                self.wait(2, 1) # delay: make sure ball can be release from claw before it shuts again in state 1
+                self._wait(2, 1) # delay: make sure ball can be release from claw before it shuts again in state 1
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
@@ -643,7 +643,7 @@ class Rescue(LifecycleNode):
             if self.side_tof_distance > 150:
                 self.publish_cmd_vel(0, 0)
                 self.get_logger().info('found potential exit')
-                self.move.drive(0, 180, -100) # rotate left
+                self.move.drive(0, -180, 100) # rotate left
                 self.state = 101
     
         elif self.state == 101:
