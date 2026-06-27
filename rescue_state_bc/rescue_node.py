@@ -181,7 +181,7 @@ class Rescue(LifecycleNode):
         self.scan_pub = self.create_publisher(LaserScan, '/scan', 10)
         self.led_cmd_pub = self.create_publisher(LEDCommand, 'led_command', 10)
         self.cmd_vel_pub = self.create_publisher(Twist, '/cmd_vel', 10)
-        self.claw_pub = self.create_publisher(Float32, '/servo/claw', 10) # 0.5 is open, 1 is closed
+        self.claw_pub = self.create_publisher(Float32, '/servo/grab', 10) # 0.5 is open, 1 is closed
         self.lift_pub = self.create_publisher(Float32, '/servo/lift', 10) # up is 2.5, down is 0.2
 
         return TransitionCallbackReturn.SUCCESS
