@@ -385,11 +385,11 @@ class Rescue(LifecycleNode):
                 if self.search_step == 0: # turn right
                     self.move.drive(0, 210, 100)
                 elif self.search_step == 1: # straight
-                    self.move.drive(0, -210, 100)
+                    self.move.drive(0, 210, 100)
                 elif self.search_step == 2: # left 
-                    self.move.drive(0, -210, 100)
+                    self.move.drive(0, 210, 100)
                 elif self.search_step == 3: # back  
-                    self.move.drive(0, -210, 100)
+                    self.move.drive(0, 210, 100)
                 self.turns += 1
                 self._wait(5, 5)
 
@@ -439,7 +439,26 @@ class Rescue(LifecycleNode):
 
         elif self.state == 61:
             if not getattr(self.move, 'busy', False):
-                pass
+                if self._detection_future is None:
+                    self.get_logger().info(f'Re-requesting detection for "{self.current_target}" after first alignment...')
+                    self._request_detections()
+                    self.state = 62
+
+        elif self.state == 62:
+            if not getattr(self.move, 'busy', False):
+                if self._detections_ready():
+                    target = self._find_target(self.current_target)
+                    if target is not None:
+                        self.target_detection = target
+                        bearing = target['bearing']
+                        self.move.drive(0, bearing * self.rad_to_turn, 100)
+                        self.get_logger().info(f'Second alignment to target bearing: {bearing * self.rad_to_turn} rad')
+                        self._wait(3, 7)
+                    else:
+                        # lost the target after first alignment rotate and search again
+                        self.get_logger().warn(f'Lost "{self.current_target}" during re-detection, returning to search...')
+                        self.search_step = 0
+                        self.state = 2
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
@@ -464,9 +483,12 @@ class Rescue(LifecycleNode):
         elif self.state == 9:
             self.lift('down')
             self.grab('open')
+            self._wait(1, 91)
+
+        elif self.state == 91:
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(0.02, 0.015)
+                self.publish_cmd_vel(0.02, 0.012)
                 self.tof_seen = self.get_clock().now()
                 self.state = 10
 
@@ -477,7 +499,7 @@ class Rescue(LifecycleNode):
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(30, 0, 50)
                 self.state = 11
-            elif self.get_clock().now() - self.tof_seen > 1:
+            elif self.get_clock().now() - self.tof_seen > rclpy.duration.Duration(seconds=1):
                 self.get_logger().warn(f'Could not see victim, canceling')
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(-100, 0, 50)  # back up a bit
