@@ -435,12 +435,16 @@ class Rescue(LifecycleNode):
                 bearing = self.target_detection['bearing']
                 self.move.drive(0, bearing * self.rad_to_turn, 100)
                 self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
-                self._wait(3, 7)
+                self._wait(4, 7)
+
+        elif self.state == 61:
+            if not getattr(self.move, 'busy', False):
+                pass
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
-                self.move.drive(distance * self.m_to_dist - 80, 0, 100)
+                self.move.drive(distance * self.m_to_dist - 40, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
                 self._wait(5, 8)
 
@@ -462,7 +466,8 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(0.02, 0.01)
+                self.publish_cmd_vel(0.02, 0.015)
+                self.tof_seen = self.get_clock().now()
                 self.state = 10
 
         # when claw is close enough stop
@@ -472,11 +477,16 @@ class Rescue(LifecycleNode):
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(30, 0, 50)
                 self.state = 11
+            elif self.get_clock().now() - self.tof_seen > 1:
+                self.get_logger().warn(f'Could not see victim, canceling')
+                self.publish_cmd_vel(0, 0)
+                self.move.drive(-100, 0, 50)  # back up a bit
+                self.state = 2
 
         elif self.state == 11:
             if not getattr(self.move, 'busy', False):
                 self.grab('close')
-                self.move.drive(-100, 0, 100)  # pull victim back
+                self.move.drive(-60, 0, 100)  # pull victim back
                 self._wait(2, 12)
 
         elif self.state == 12:
