@@ -375,6 +375,7 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.grab('close')
             self.lift('up')
+            turns = 0
             self.state = 2
 
         # wait for drive in to finish then rotate right
@@ -384,11 +385,12 @@ class Rescue(LifecycleNode):
                 if self.search_step == 0: # turn right
                     self.move.drive(0, 210, 100)
                 elif self.search_step == 1: # straight
-                    self.move.drive(0, 210, -100)
+                    self.move.drive(0, -210, 100)
                 elif self.search_step == 2: # left 
-                    self.move.drive(0, 210, -100)
+                    self.move.drive(0, -210, 100)
                 elif self.search_step == 3: # back  
-                    self.move.drive(0, 210, -100)
+                    self.move.drive(0, -210, 100)
+                turns += 1
                 self._wait(2, 5)
 
       # search for the current target
@@ -403,7 +405,7 @@ class Rescue(LifecycleNode):
             if self._detections_ready():
                 target = self._find_target(self.current_target)
                 if target is not None:
-                    self.get_logger().info(f'"{self.current_target}" detected, aligning...')
+                    self.get_logger().info(f'"{self.current_target}" detected after "{turns}" turns, aligning...')
                     self.target_type = self.current_target
                     self.target_detection = target
                     self.state = 6
