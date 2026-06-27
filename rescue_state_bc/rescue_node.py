@@ -149,7 +149,7 @@ class Rescue(LifecycleNode):
     exit_kp = 0.5
     black_line_seen = False
     search_step = 0
-    rad_to_turn = 115
+    rad_to_turn = 147
     m_to_dist = 530
 
     def __init__(self):
@@ -384,13 +384,13 @@ class Rescue(LifecycleNode):
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
                 if self.search_step == 0: # turn right
-                    self.move.drive(0, 180, 100)
+                    self.move.drive(0, 210, 100)
                 elif self.search_step == 1: # straight
-                    self.move.drive(0, 180, -100)
+                    self.move.drive(0, 210, -100)
                 elif self.search_step == 2: # left 
-                    self.move.drive(0, 180, -100)
+                    self.move.drive(0, 210, -100)
                 elif self.search_step == 3: # back  
-                    self.move.drive(0, 180, -100)
+                    self.move.drive(0, 210, -100)
                 self._wait(2, 5)
 
       # search for the current target
