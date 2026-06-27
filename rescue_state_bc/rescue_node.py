@@ -150,7 +150,7 @@ class Rescue(LifecycleNode):
     black_line_seen = False
     search_step = 0
     rad_to_turn = 115
-    m_to_dist = 460
+    m_to_dist = 530
 
     def __init__(self):
         super().__init__('rescue_node')
@@ -453,7 +453,7 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(50, 20)
+                self.publish_cmd_vel(10, 5)
                 self.state = 10
 
         # when claw is close enough stop
