@@ -460,7 +460,7 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(0.07, 0.02)
+                self.publish_cmd_vel(0.007, 0.002)
                 self.state = 10
 
         # when claw is close enough stop
