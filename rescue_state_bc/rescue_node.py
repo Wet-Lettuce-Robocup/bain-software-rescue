@@ -184,6 +184,11 @@ class Rescue(LifecycleNode):
         self.claw_pub = self.create_publisher(Float32, '/servo/grab', 10) # 0.5 is open, 1 is closed
         self.lift_pub = self.create_publisher(Float32, '/servo/lift', 10) # up is 2.5, down is 0.2
 
+        self.front_tof_distance = 999999
+        self.claw_tof_distance = 999999
+        self.side_tof_distance = 999999
+        self.get_logger().info('rescue_node configured!!')
+
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state):
