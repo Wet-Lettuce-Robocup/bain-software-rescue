@@ -380,6 +380,8 @@ class Rescue(LifecycleNode):
 
         # wait for drive in to finish then rotate right
         elif self.state == 2:
+            self.lift('up')
+            self.grab('close')
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
                 if self.search_step == 0: # turn right
@@ -434,8 +436,8 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 bearing = self.target_detection['bearing']
                 self.move.drive(0, bearing * self.rad_to_turn, 100)
-                self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad')
-                self._wait(4, 7)
+                self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad*mult')
+                self._wait(4, 61)
 
         elif self.state == 61:
             if not getattr(self.move, 'busy', False):
