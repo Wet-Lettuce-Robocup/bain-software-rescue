@@ -341,10 +341,10 @@ class Rescue(LifecycleNode):
     def lift(self, position):
         if position == 'up':
             self.get_logger().info('Lift raised')
-            self.lift_pub.publish(Float32(data=2.5))
+            self.lift_pub.publish(Float32(data=2.7))
         elif position == 'down':
             self.get_logger().info('Lift lowered')
-            self.lift_pub.publish(Float32(data=0.2))
+            self.lift_pub.publish(Float32(data=0.4))
     
     def grab(self, position):
         if position == 'open':
@@ -454,7 +454,7 @@ class Rescue(LifecycleNode):
                         self.target_detection = target
                         bearing = target['bearing']
                         self.move.drive(0, bearing * self.rad_to_turn, 100)
-                        self.get_logger().info(f'Second alignment to target bearing: {bearing * self.rad_to_turn} rad')
+                        self.get_logger().info(f'Second alignment to target bearing: {bearing*self.rad_to_turn:.3f} rad')
                         self._wait(3, 7)
                     else:
                         # lost the target after first alignment rotate and search again
@@ -467,7 +467,47 @@ class Rescue(LifecycleNode):
                 distance = self.target_detection['distance']
                 self.move.drive(distance * self.m_to_dist - 40, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
-                self._wait(5, 8)
+                self._wait(6, 75)
+
+        elif self.state == 71:
+            if not getattr(self.move, 'busy', False):
+                self.get_logger().info(f'Arrived at target, distance to target: {self.claw_tof_distance:.3f} m')
+                self._request_detections()
+                self.state = 72
+
+        elif self.state == 72:
+            if not getattr(self.move, 'busy', False):
+                if self._detections_ready():
+                    target = self._find_target(self.current_target)
+                    if target is not None:
+                        self.target_detection = target
+                        self.get_logger().info(f'Re-Re-detected "{self.current_target}" at distance: {target["distance"]:.3f} m')
+                        self.move.drive(target['distance'] * self.m_to_dist - 40, 0, 100)
+                        self._wait(3, 73)
+                    else:
+                        self.get_logger().warn(f'Lost "{self.current_target}" during re-re-detection, returning to search...')
+                        self.search_step = 0
+                        self.state = 2
+
+        elif self.state == 73:
+            if not getattr(self.move, 'busy', False):
+                self._request_detections()
+                self.state = 74
+
+        elif self.state == 74:
+            if not getattr(self.move, 'busy', False):
+                if self._detections_ready():
+                    target = self._find_target(self.current_target)
+                    if target is not None:
+                        self.target_detection = target
+                        self.get_logger().info(f'Re-Re-Re-detection of "{self.current_target}" at distance: {target["distance"]:.3f} m')
+                        self.move.drive(0, target['bearing'] * self.rad_to_turn, 100)
+                        self.get_logger().info(f'Re-Re-Re-Aligning to target bearing: {target["bearing"]*self.rad_to_turn:.3f} rad')
+                        self.state = 8
+                    else:
+                        self.get_logger().warn(f'Lost "{self.current_target}" during re-re-re-detection, returning to search...')
+                        self.search_step = 0
+                        self.state = 2
 
         elif self.state == 8:
             if not getattr(self.move, 'busy', False):
@@ -490,7 +530,7 @@ class Rescue(LifecycleNode):
         elif self.state == 91:
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(0.02, 0.012)
+                self.publish_cmd_vel(0.018, 0.013)
                 self.tof_seen = self.get_clock().now()
                 self.state = 10
 
@@ -511,14 +551,17 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.grab('close')
                 self.move.drive(-60, 0, 100)  # pull victim back
-                self._wait(2, 12)
+                self._wait(4, 12)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
                 self.lift('up')
-                if self.target_type == 'silver':
-                    self.grab('open')
-                self.state = 13
+                self._wait(4, 121)
+
+        elif self.state == 121:
+            if self.target_type == 'silver':
+                self.grab('open')
+            self.state = 13
 
         # count victim and return to search
         elif self.state == 13:
