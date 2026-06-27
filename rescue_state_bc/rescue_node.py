@@ -391,7 +391,7 @@ class Rescue(LifecycleNode):
                     self.move.drive(0, 180, -100)
                 elif self.search_step == 3: # back  
                     self.move.drive(0, 180, -100)
-                _wait(2, 5)
+                self._wait(2, 5)
 
       # search for the current target
         elif self.state == 3:
