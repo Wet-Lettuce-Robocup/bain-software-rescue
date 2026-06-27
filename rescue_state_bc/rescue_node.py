@@ -439,7 +439,7 @@ class Rescue(LifecycleNode):
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
-                self.move.drive(distance * self.m_to_dist, 0, 100)
+                self.move.drive(distance * self.m_to_dist - 80, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
                 self._wait(5, 8)
 
