@@ -460,7 +460,7 @@ class Rescue(LifecycleNode):
             self.grab('open')
             self.get_logger().info(f'Lowered lift and opened claw for victim "{self.target_type}"')
             if not getattr(self.move, 'busy', False):
-                self.publish_cmd_vel(10, 5)
+                self.publish_cmd_vel(0.1, 0.05)
                 self.state = 10
 
         # when claw is close enough stop
@@ -565,7 +565,7 @@ class Rescue(LifecycleNode):
             if getattr(self.move, 'busy', False) == False:
                 self.black_line_seen = False
                 # enable down vision 
-                self.publish_cmd_vel(90, 0) # drive forward
+                self.publish_cmd_vel(20, 0) # drive forward
                 if self.black_line_seen:
                     self.publish_cmd_vel(0, 0)
                     self.get_logger().info('Black line seen, exit confirmed')
