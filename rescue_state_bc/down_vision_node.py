@@ -32,11 +32,17 @@ class DownVisionNode(Node):
         self.get_logger().fatal(f'{self.upper_redline2}')
 
         # subscriptions
+
+        camera_qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
         self.camera_sub = self.create_subscription(
             Image,
             self.get_parameter('camera_topic').value,
             self.image_callback,
-            10
+            camera_qos
         )
         self.enable_sub = self.create_subscription(
             Bool,
@@ -65,19 +71,6 @@ class DownVisionNode(Node):
             '/red_present',
             10
         )
-        qos = QoSProfile(
-            reliability=QoSReliabilityPolicy.BEST_EFFORT,
-            history=QoSHistoryPolicy.KEEP_LAST,
-            depth=1,
-        )
-
-        self.create_subscription(
-            Image,
-            "/down_camera/camera_node/image_raw",
-            self.image_callback,
-            qos,
-        )
-
         self.timer = self.create_timer(0.1, self.timer_callback)
     
     def enable_callback(self, msg):
