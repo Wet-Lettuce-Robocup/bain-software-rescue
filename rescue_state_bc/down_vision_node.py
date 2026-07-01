@@ -10,6 +10,13 @@ import numpy as np
 class DownVisionNode(Node):
     vision_enabled = False
     black_line_size = 2000
+    silver_line_size = 200000
+    red_line_size = 200000
+
+    lower_redline = np.array([0, 100, 100])
+    upper_redline = np.array([10, 255, 255])
+    lower_redline2 = np.array([170, 100, 100])
+    upper_redline2 = np.array([180, 255, 255])
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()
@@ -79,10 +86,14 @@ class DownVisionNode(Node):
         self.current_frame = frame
 
     def detect_silver(self, image):
-        image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
-        image = cv.inRange(image, 245, 255) # really bright spots
+        silver = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        silver = cv.inRange(silver, 245, 255) # really bright spots
+        kernel = cv.getStructuringElement(cv.MORPH_ELLIPSE, (100, 100))
+        silver = cv.morphologyEx(silver, cv.MORPH_CLOSE, kernel)
+        silver_raw = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
+        silver_raw = cv.inRange(silver_raw, 245, 255)
         present = Bool()
-        if cv.countNonZero(image) > 100:
+        if cv.countNonZero(silver_raw) > self.silver_line_size:
             self.get_logger().info('Silver strip detected')
             present.data = True
         else:
@@ -107,9 +118,11 @@ class DownVisionNode(Node):
     def detect_red(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
         image = cv.GaussianBlur(image, (5, 5), 0)
-        image = cv.inRange(image, self.lower_red, self.upper_red)
+        image = cv.inRange(image, self.lower_redline, self.upper_redline)
+        image2 = cv.inRange(image, self.lower_redline2, self.upper_redline2)
+        image = cv.bitwise_or(image, image2)
         present = Bool()
-        if cv.countNonZero(image) > 100:
+        if cv.countNonZero(image) > self.red_line_size:
             self.get_logger().info('Red detected')
             present.data = True
         else:

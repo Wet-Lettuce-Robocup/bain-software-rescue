@@ -18,13 +18,18 @@ upper_red2 = np.array([180, 255, 255])
 black_hsv_min = np.array([0, 0, 10])
 black_hsv_max = np.array([180, 255, 50])
 
+lower_redline = np.array([0, 100, 100])
+upper_redline = np.array([10, 255, 255])
+lower_redline2 = np.array([170, 100, 100])
+upper_redline2 = np.array([180, 255, 255])
+
 min_tray_size = 10000
 min_silver_ball_size = 20
 min_black_ball_size = 40000
 # =============================
 
-image = cv.imread("30percent.jpg")
-image = image[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
+image = cv.imread("image6.jpg")
+#image = image[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 output = image.copy()
 
 
@@ -58,12 +63,20 @@ green = cv.inRange(green, lower_green, upper_green)
 draw_detections(green, min_tray_size, "GREEN")
 
 # Red tray
-red = cv.cvtColor(image, cv.COLOR_BGR2HSV)
-red = cv.GaussianBlur(red, (5, 5), 0)
-red1 = cv.inRange(red, lower_red1, upper_red1)
-red2 = cv.inRange(red, lower_red2, upper_red2)
-red = cv.bitwise_or(red1, red2)
-draw_detections(red, min_tray_size, "RED")
+# red = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+# red = cv.GaussianBlur(red, (5, 5), 0)
+# red1 = cv.inRange(red, lower_red1, upper_red1)
+# red2 = cv.inRange(red, lower_red2, upper_red2)
+# red = cv.bitwise_or(red1, red2)
+# draw_detections(red, min_tray_size, "RED")
+
+#red line
+redline = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+redline = cv.GaussianBlur(redline, (5, 5), 0)
+redline1 = cv.inRange(redline, lower_redline, upper_redline)
+redline2 = cv.inRange(redline, lower_redline2, upper_redline2)
+redline = cv.bitwise_or(redline1, redline2)
+draw_detections(redline, min_tray_size, "RED LINE")
 
 # Silver victim
 # silver = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
@@ -81,13 +94,15 @@ draw_detections(silver, min_silver_ball_size, "SILVER")
 silver_raw = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
 silver_raw = cv.inRange(silver_raw, 245, 255)
 
-# Black victim
-black = cv.GaussianBlur(image, (5, 5), 0)
-black = cv.cvtColor(black, cv.COLOR_BGR2HSV)
-black = cv.inRange(black, black_hsv_min, black_hsv_max)
-draw_detections(black, min_black_ball_size, "BLACK")
+# # Black victim
+# black = cv.GaussianBlur(image, (5, 5), 0)
+# black = cv.cvtColor(black, cv.COLOR_BGR2HSV)
+# black = cv.inRange(black, black_hsv_min, black_hsv_max)
+# draw_detections(black, min_black_ball_size, "BLACK")
 
 cv.imshow("Detections", output)
-cv.imshow("Black", black)
+cv.imshow('red', redline)
+cv.imshow('silver', silver)
+print(f"Number of silver pixels: {cv.countNonZero(silver_raw)}") #200k ish
 cv.waitKey(0)
 cv.destroyAllWindows()
