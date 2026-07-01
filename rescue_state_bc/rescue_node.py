@@ -541,6 +541,10 @@ class Rescue(LifecycleNode):
 
         # when claw is close enough stop
         elif self.state == 10:
+            if self.claw_tof_distance is None:
+                self.get_logger().warn('Claw TOF distance is None, cannot proceed')
+                self.state = 2
+                return
             self.get_logger().info(f'Claw TOF distance: {self.claw_tof_distance:.3f} m')
             if self.claw_tof_distance < 0.03 and self.claw_tof_distance > 0.01:
                 self.publish_cmd_vel(0, 0)
