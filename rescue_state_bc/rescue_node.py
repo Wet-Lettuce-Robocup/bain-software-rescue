@@ -658,13 +658,16 @@ class Rescue(LifecycleNode):
         elif self.state == 101:
             if getattr(self.move, 'busy', False) == False:
                 self.black_line_seen = False
-                # enable down vision 
+                self.black_line_seen = False
                 self.publish_cmd_vel(20, 0) # drive forward
                 if self.black_line_seen:
                     self.publish_cmd_vel(0, 0)
-                    self.get_logger().info('Black line seen, exit confirmed')
+                    self.get_logger().info('black line seen, exit confirmed')
                     self.move.drive(100, 0, 100) # drive out of exit
-                    self.state = 102
+                    self.state = 102 #WHAT PUT HERE
+                else:
+                    self.get_logger().info('no black line, not an exit')
+                    self.state = 101
 
         elif self.state == 99:
             if getattr(self, 'wait_until', None) is not None and self.get_clock().now() >= self.wait_until:
