@@ -200,6 +200,7 @@ class Rescue(LifecycleNode):
         self.get_logger().info('Activating...')
         self.control_timer = self.create_timer(0.05, self.rescue_control_loop)
         self.move.move_client.wait_for_server()
+        self.state = 1
         return TransitionCallbackReturn.SUCCESS
 
     def on_deactivate(self, state):
