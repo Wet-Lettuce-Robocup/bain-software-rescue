@@ -10,14 +10,14 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 class DownVisionNode(Node):
     vision_enabled = False
-    black_line_size = 100000
-    silver_line_size = 200000
+    black_line_size = 40000
+    silver_line_size = 7000
     red_line_size = 200000
 
-    lower_redline = np.array([0, 100, 100], dtype=np.uint8)
-    upper_redline = np.array([10, 255, 255], dtype=np.uint8)
-    lower_redline2 = np.array([170, 100, 100], dtype=np.uint8)
-    upper_redline2 = np.array([180, 255, 255], dtype=np.uint8)
+    lower_redline = np.array([0, 100, 100])
+    upper_redline = np.array([10, 255, 255])
+    lower_redline2 = np.array([170, 100, 100])
+    upper_redline2 = np.array([180, 255, 255])
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()
