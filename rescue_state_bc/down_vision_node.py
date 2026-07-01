@@ -10,7 +10,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 class DownVisionNode(Node):
     vision_enabled = False
-    black_line_size = 2000
+    black_line_size = 100000
     silver_line_size = 200000
     red_line_size = 200000
 
@@ -111,6 +111,7 @@ class DownVisionNode(Node):
             present.data = True
         else:
             present.data = False
+        self.get_logger().info(f'Silver present: {cv.countNonZero(silver_raw)}')
         self.silver_present_pub.publish(present)
         
     def silver_strip_angle(self, image):
@@ -126,6 +127,7 @@ class DownVisionNode(Node):
             line.data = True
         else:
             line.data = False
+        self.get_logger().info(f'Black line present: {cv.countNonZero(image)}')
         self.black_line_pub.publish(line)
 
     def detect_red(self, image):
@@ -140,6 +142,7 @@ class DownVisionNode(Node):
             present.data = True
         else:
             present.data = False
+            self.get_logger().info(f'Red present: {cv.countNonZero(image)}')
         self.red_present_pub.publish(present)
 
 def main(args=None):
