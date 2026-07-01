@@ -24,12 +24,12 @@ class DownVisionNode(Node):
         self.bridge = CvBridge()
         self.declare_parameter('camera_topic', '/down_camera/camera_node/image_raw')
 
-        # self.get_logger().fatal(type(self.lower_redline2))
-        # self.get_logger().fatal(type(self.upper_redline2))
-        # self.get_logger().fatal(type(self.lower_redline))
-        # self.get_logger().fatal(type(self.upper_redline))
-        # self.get_logger().fatal(self.lower_redline2)
-        # self.get_logger().fatal(self.upper_redline2)
+        self.get_logger().fatal(f'{type(self.lower_redline2)}')
+        self.get_logger().fatal(f'{type(self.upper_redline2)}')
+        self.get_logger().fatal(f'{type(self.lower_redline)}')
+        self.get_logger().fatal(f'{type(self.upper_redline)}')
+        self.get_logger().fatal(f'{self.lower_redline2}')
+        self.get_logger().fatal(f'{self.upper_redline2}')
 
         # subscriptions
         self.camera_sub = self.create_subscription(
