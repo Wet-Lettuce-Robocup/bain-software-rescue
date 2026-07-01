@@ -190,6 +190,10 @@ class Rescue(LifecycleNode):
         self.side_tof_distance = 999999
         self.get_logger().info('rescue_node configured!!')
 
+        # start down vision
+        self.down_vision_enable_pub.publish(Bool(data=True))
+        self.get_logger().info('Down vision enabled')
+
         return TransitionCallbackReturn.SUCCESS
 
     def on_activate(self, state):
@@ -262,7 +266,7 @@ class Rescue(LifecycleNode):
         try:
             self.front_tof_distance = float(msg.data) / 1000.0
         except Exception:
-            self.front_tof_distance = 999999
+            self.front_tof_distance = None
 
     def claw_tof_callback(self, msg):
         try:
@@ -270,13 +274,13 @@ class Rescue(LifecycleNode):
         except Exception:
             self.get_logger().error('Failed to parse claw TOF distance, WHAT IS GOING ON BRUHHHH')
             self.get_logger().error(f'Failed to parse claw TOF distance, msg: {msg} bruh')
-            self.claw_tof_distance = 999999
+            self.claw_tof_distance = None
 
     def side_tof_callback(self, msg):
         try:
             self.side_tof_distance = float(msg.data) / 1000.0
         except Exception:
-            self.side_tof_distance = 999999
+            self.side_tof_distance = None
 
     def face_bearing(self, bearing: float, rotate_vel=0.1):
         current = self.move.current_angle
@@ -373,6 +377,7 @@ class Rescue(LifecycleNode):
         # move in
         if self.state == 1:
             self.move.drive(140, 0, 100)
+            self.get_logger().info('state 2 rescue')
             self.grab('close')
             self.lift('up')
             self.turns = 0
