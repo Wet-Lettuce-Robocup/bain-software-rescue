@@ -45,6 +45,11 @@ class DownVisionNode(Node):
             '/black_present',
             10
         )
+        self.red_present_pub = self.create_publisher(
+            Bool,
+            '/red_present',
+            10
+        )
 
         self.timer = self.create_timer(0.1, self.timer_callback)
     
@@ -58,10 +63,10 @@ class DownVisionNode(Node):
     def timer_callback(self):
         if hasattr(self, 'current_frame'):
             if self.vision_enabled:
-                self.detect_silver_strips(self.current_frame)
+                self.detect_silver(self.current_frame)
                 self.silver_strip_angle(self.current_frame)
-            else:
-                self.detect_silver_strips(self.current_frame)
+                self.detect_black(self.current_frame)
+                self.detect_red(self.current_frame)
 
     def image_callback(self, msg):
         if not self.vision_enabled:
@@ -73,7 +78,7 @@ class DownVisionNode(Node):
         )
         self.current_frame = frame
 
-    def detect_silver_strips(self, image):
+    def detect_silver(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2GRAY)
         image = cv.inRange(image, 245, 255) # really bright spots
         present = Bool()
@@ -89,7 +94,7 @@ class DownVisionNode(Node):
         # can use this to align with the strip and follow it
         pass
 
-    def detect_black_line(self, image):
+    def detect_black(self, image):
         image = cv.inRange(image, (0,0,0), (50,50,50)) # NEED Upadate
         line = Bool()
         if cv.countNonZero(image) > self.black_line_size:
@@ -98,6 +103,18 @@ class DownVisionNode(Node):
         else:
             line.data = False
         self.black_line_pub.publish(line)
+
+    def detect_red(self, image):
+        image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        image = cv.GaussianBlur(image, (5, 5), 0)
+        image = cv.inRange(image, self.lower_red, self.upper_red)
+        present = Bool()
+        if cv.countNonZero(image) > 100:
+            self.get_logger().info('Red detected')
+            present.data = True
+        else:
+            present.data = False
+        self.red_present_pub.publish(present)
 
 def main(args=None):
     rclpy.init(args=args)
