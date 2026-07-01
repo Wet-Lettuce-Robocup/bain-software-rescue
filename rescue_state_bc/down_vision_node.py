@@ -138,9 +138,9 @@ class DownVisionNode(Node):
     def detect_red(self, image):
         image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
         image = cv.GaussianBlur(image, (5, 5), 0)
-        image = cv.inRange(image, self.lower_redline, self.upper_redline)
+        image1 = cv.inRange(image, self.lower_redline, self.upper_redline)
         image2 = cv.inRange(image, self.lower_redline2, self.upper_redline2)
-        image = cv.bitwise_or(image, image2)
+        image = cv.bitwise_or(image1, image2)
         present = Bool()
         if cv.countNonZero(image) > self.red_line_size:
             self.get_logger().info('Red detected')
