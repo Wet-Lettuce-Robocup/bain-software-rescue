@@ -15,8 +15,8 @@ class DownVisionNode(Node):
 
     lower_redline = np.array([0, 100, 100])
     upper_redline = np.array([10, 255, 255])
-    lower_redline2 = np.array([170, 100, 100])
-    upper_redline2 = np.array([180, 255, 255])
+    lower_redline2 = np.array([170, 100, 100]), dtype=np.uint8
+    upper_redline2 = np.array([180, 255, 255]), dtype=np.uint8
     def __init__(self):
         super().__init__('down_vision')
         self.msg = DetectionsMsg()

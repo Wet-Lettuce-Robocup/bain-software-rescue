@@ -13,6 +13,7 @@ from geometry_msgs.msg import Twist
 import math
 import matplotlib.pyplot as plt
 from robot_msgs.srv import Inference
+from gpiozero import Button
 
 class Movement():
     def __init__(self, node):
@@ -184,15 +185,20 @@ class Rescue(LifecycleNode):
         self.claw_pub = self.create_publisher(Float32, '/servo/grab', 10) # 0.5 is open, 1 is closed
         self.lift_pub = self.create_publisher(Float32, '/servo/lift', 10) # up is 2.5, down is 0.2
         self.gate_pub = self.create_publisher(Float32, '/servo/gate', 10) # open is 2.3, closed is 0.8
+        self.rescue_active_pub = self.create_publisher(Bool, '/rescue_active', 10)
 
         self.front_tof_distance = 999999
         self.claw_tof_distance = 999999
         self.side_tof_distance = 999999
+
+        cond = Button(27) 
+
         self.get_logger().info('rescue_node configured!!')
 
         # start down vision
         self.down_vision_enable_pub.publish(Bool(data=True))
         self.get_logger().info('Down vision enabled')
+
 
         return TransitionCallbackReturn.SUCCESS
 
@@ -577,11 +583,10 @@ class Rescue(LifecycleNode):
         elif self.state == 13:
             if not getattr(self.move, 'busy', False):
 
-                if self.target_type == 'silver':
+                if self.target_type == 'silver' and self.cond.is_pressed():
                     self.silver_victims_collected += 1
                 else:
                     self.black_victims_collected += 1
-
                 self.target_type = None
                 self.target_detection = None
 
@@ -665,7 +670,9 @@ class Rescue(LifecycleNode):
                     self.publish_cmd_vel(0, 0)
                     self.get_logger().info('black line seen, exit confirmed')
                     self.move.drive(100, 0, 100) # drive out of exit
-                    self.state = 102 #WHAT PUT HERE
+                    
+                    self.get_logger().info('deactivating rescue node')
+                    self.rescue_active_pub.publish(Bool(data=False))
                 else:
                     self.get_logger().info('no black line, not an exit')
                     self.state = 101
