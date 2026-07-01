@@ -6,6 +6,7 @@ from std_msgs.msg import Bool, Float32
 from robot_msgs.msg import Detections as DetectionsMsg
 import cv2 as cv
 import numpy as np
+from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 class DownVisionNode(Node):
     vision_enabled = False
@@ -56,6 +57,18 @@ class DownVisionNode(Node):
             Bool,
             '/red_present',
             10
+        )
+        qos = QoSProfile(
+            reliability=QoSReliabilityPolicy.BEST_EFFORT,
+            history=QoSHistoryPolicy.KEEP_LAST,
+            depth=1,
+        )
+
+        self.create_subscription(
+            Image,
+            "/down_camera/camera_node/image_raw",
+            self.image_callback,
+            qos,
         )
 
         self.timer = self.create_timer(0.1, self.timer_callback)
