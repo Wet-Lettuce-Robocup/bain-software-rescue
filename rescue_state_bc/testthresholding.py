@@ -28,7 +28,7 @@ min_silver_ball_size = 20
 min_black_ball_size = 40000
 # =============================
 
-image = cv.imread("image6.jpg")
+image = cv.imread("image99.jpg")
 #image = image[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 output = image.copy()
 
