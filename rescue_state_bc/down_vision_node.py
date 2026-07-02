@@ -127,7 +127,6 @@ class DownVisionNode(Node):
             line.data = True
         else:
             line.data = False
-        self.get_logger().info(f'Black line present: {cv.countNonZero(image)}')
         self.black_line_pub.publish(line)
 
     def detect_red(self, image):
@@ -142,7 +141,6 @@ class DownVisionNode(Node):
             present.data = True
         else:
             present.data = False
-            self.get_logger().info(f'Red present: {cv.countNonZero(image)}')
         self.red_present_pub.publish(present)
 
 def main(args=None):
