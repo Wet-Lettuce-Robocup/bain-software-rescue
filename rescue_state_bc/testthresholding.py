@@ -7,8 +7,8 @@ roi_x_max = 3320
 roi_y_min = 850
 roi_y_max = 1800
 
-lower_green = np.array([40, 80, 50])
-upper_green = np.array([90, 255, 255])
+lower_green = np.array([35, 50, 80])
+upper_green = np.array([100, 255, 255])
 
 lower_red1 = np.array([0, 80, 50])
 upper_red1 = np.array([10, 255, 255])
@@ -28,7 +28,7 @@ min_silver_ball_size = 20
 min_black_ball_size = 40000
 # =============================
 
-image = cv.imread("image99.jpg")
+image = cv.imread("image.png")
 #image = image[roi_y_min:roi_y_max, roi_x_min:roi_x_max]
 output = image.copy()
 
@@ -103,6 +103,8 @@ silver_raw = cv.inRange(silver_raw, 245, 255)
 cv.imshow("Detections", output)
 cv.imshow('red', redline)
 cv.imshow('silver', silver)
+cv.imshow('green', green)
+print(f"number of green pixels: {cv.countNonZero(green)}") 
 print(f"Number of silver pixels: {cv.countNonZero(silver_raw)}") #200k ish
 cv.waitKey(0)
 cv.destroyAllWindows()
