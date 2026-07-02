@@ -107,11 +107,11 @@ class DownVisionNode(Node):
         silver_raw = cv.inRange(silver_raw, 245, 255)
         present = Bool()
         if cv.countNonZero(silver_raw) > self.silver_line_size:
-            self.get_logger().info('Silver strip detected')
+            # self.get_logger().info('Silver strip detected')
+            self.get_logger().info(f'Silver present: {cv.countNonZero(silver_raw)}')
             present.data = True
         else:
             present.data = False
-        self.get_logger().info(f'Silver present: {cv.countNonZero(silver_raw)}')
         self.silver_present_pub.publish(present)
         
     def silver_strip_angle(self, image):
@@ -123,7 +123,7 @@ class DownVisionNode(Node):
         image = cv.inRange(image, (0,0,0), (50,50,50)) # NEED Upadate
         line = Bool()
         if cv.countNonZero(image) > self.black_line_size:
-            self.get_logger().info('Black line detected')
+            # self.get_logger().info('Black line detected')
             line.data = True
         else:
             line.data = False
