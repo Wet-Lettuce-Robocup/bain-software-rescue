@@ -604,17 +604,15 @@ class Rescue(LifecycleNode):
         elif self.state == 15:
             if self.target_type == 'green':
                 self.publish_cmd_vel(50, 0)
-                if True: # WHEN CAMERA IS FULL GREEN CHANGE THIS
-                    self.publish_cmd_vel(0, 0)
-                    self.lift('up')
-                    self.state = 16
+                self.publish_cmd_vel(0, 0)
+                self.lift('up')
+                self.state = 16
             elif self.target_type == 'red':
                 self.publish_cmd_vel(50, 0)
                 self.grab('open')
-                if True: # WHEN CAMERA IS FULL RED CHANGE THiS
-                    self.publish_cmd_vel(0, 0)
-                    self.lift('up')
-                    self.state = 16
+                self.publish_cmd_vel(0, 0)
+                self.lift('up')
+                self.state = 16
 
         elif self.state == 16:
             if not getattr(self.move, 'busy', False):
