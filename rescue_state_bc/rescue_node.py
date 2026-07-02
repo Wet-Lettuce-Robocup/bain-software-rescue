@@ -477,7 +477,7 @@ class Rescue(LifecycleNode):
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
                 distance = self.target_detection['distance']
-                self.move.drive(distance * self.m_to_dist - 40, 0, 100)
+                self.move.drive(distance * self.m_to_dist - 60, 0, 100)
                 self.get_logger().info(f'Moving towards target, distance: {distance*self.m_to_dist} mm')
                 self._wait(6, 71)
 
@@ -485,7 +485,7 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.get_logger().info(f'Arrived at target, distance to target: {self.claw_tof_distance:.3f} m')
                 self._request_detections()
-                self.state = 72
+                self.state = 8
 
         elif self.state == 72:
             if not getattr(self.move, 'busy', False):
@@ -670,7 +670,7 @@ class Rescue(LifecycleNode):
                     self.publish_cmd_vel(0, 0)
                     self.get_logger().info('black line seen, exit confirmed')
                     self.move.drive(100, 0, 100) # drive out of exit
-                    
+
                     self.get_logger().info('deactivating rescue node')
                     self.rescue_active_pub.publish(Bool(data=False))
                 else:
