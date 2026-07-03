@@ -391,7 +391,7 @@ class Rescue(LifecycleNode):
             self.grab('close')
             self._wait(0.5, 11)
 
-        if self.state == 11:
+        if self.state == 110:
             self.lift('up')
             self.turns = 0
             self.state = 2
