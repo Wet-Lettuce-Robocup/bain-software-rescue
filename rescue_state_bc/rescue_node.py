@@ -377,6 +377,7 @@ class Rescue(LifecycleNode):
         if getattr(self, '_last_state', None) != self.state:
             try:
                 self._publish_led_for_state(self.state)
+                self.get_logger().info(f'State changed to {self.state}')
             except Exception as e:
                 self.get_logger().error(f'Failed to publish LED for state {self.state}: {e}')
             self._last_state = self.state
@@ -408,12 +409,12 @@ class Rescue(LifecycleNode):
                 self._wait(5, 5)
 
       # search for the current target
-        elif self.state == 3:
-            if not getattr(self.move, 'busy', False):
-                if self._detection_future is None:
-                    self.current_target = self._current_target_type()
-                    self._request_detections()
-                    self.state = 4
+        # elif self.state == 3:
+        #     if not getattr(self.move, 'busy', False):
+        #         if self._detection_future is None:
+        #             self.current_target = self._current_target_type()
+        #             self._request_detections()
+        #             self.state = 4
 
         elif self.state == 4:
             if not getattr(self.move, 'busy', False):
@@ -438,10 +439,6 @@ class Rescue(LifecycleNode):
                             self.move.drive(0, 210, 100)
                         
                         self.state = 2
-
-        elif self.state == 5:
-            if not getattr(self.move, 'busy', False):
-                self.state = 3
 
         # align to target bearing using stored detection
         elif self.state == 6:
