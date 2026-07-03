@@ -582,6 +582,9 @@ class Rescue(LifecycleNode):
         elif self.state == 11:
             if not getattr(self.move, 'busy', False):
                 self.grab('close')
+                self._wait(1, 123)
+
+        elif self.state == 123:
                 self.move.drive(-100, 0, 100)  # pull victim back
                 self._wait(10, 12)
 
