@@ -406,15 +406,15 @@ class Rescue(LifecycleNode):
                 elif self.search_step == 3: # back  
                     self.move.drive(0, 210, 100)
                 self.turns += 1
-                self._wait(5, 5)
+                self._wait(5, 3)
 
       # search for the current target
-        # elif self.state == 3:
-        #     if not getattr(self.move, 'busy', False):
-        #         if self._detection_future is None:
-        #             self.current_target = self._current_target_type()
-        #             self._request_detections()
-        #             self.state = 4
+        elif self.state == 3:
+            if not getattr(self.move, 'busy', False):
+                if self._detection_future is None:
+                    self.current_target = self._current_target_type()
+                    self._request_detections()
+                    self.state = 4
 
         elif self.state == 4:
             if not getattr(self.move, 'busy', False):
