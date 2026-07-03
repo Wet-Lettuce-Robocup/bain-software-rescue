@@ -191,7 +191,7 @@ class Rescue(LifecycleNode):
         self.claw_tof_distance = 999999
         self.side_tof_distance = 999999
 
-        cond = Button(27) 
+        # cond = Button(27) 
 
         self.get_logger().info('rescue_node configured!!')
 
@@ -580,7 +580,7 @@ class Rescue(LifecycleNode):
         elif self.state == 13:
             if not getattr(self.move, 'busy', False):
 
-                if self.target_type == 'silver' and self.cond.is_pressed():
+                if self.target_type == 'silver': #and cond.isrpesed
                     self.silver_victims_collected += 1
                 else:
                     self.black_victims_collected += 1
