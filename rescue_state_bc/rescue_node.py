@@ -416,15 +416,6 @@ class Rescue(LifecycleNode):
                     self._request_detections()
                     self.state = 4
 
-                if self._state_entered_time is not None and self.get_clock().now() - self._state_entered_time > rclpy.duration.Duration(seconds=3):
-                        self.get_logger().warn(
-                            f'Stuck in state 3 for >3s (busy={getattr(self.move, "busy", False)}, '
-                            f'future={self._detection_future}), forcing recovery'
-                        )
-                        self._detection_future = None
-                        self.move.busy = False
-                        self._state_entered_time = self.get_clock().now()
-
         elif self.state == 4:
             if not getattr(self.move, 'busy', False):
                 if self._detections_ready():
@@ -493,6 +484,7 @@ class Rescue(LifecycleNode):
                 self._request_detections()
                 self._detection_future = None   # discard — result unused before state 9
                 self.state = 8
+
         elif self.state == 72:
             if not getattr(self.move, 'busy', False):
                 if self._detections_ready():
