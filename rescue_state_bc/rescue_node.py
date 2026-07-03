@@ -389,7 +389,7 @@ class Rescue(LifecycleNode):
             self.move.drive(140, 0, 100)
             self.get_logger().info('state 2 rescue')
             self.grab('close')
-            self._wait(0.5, 11)
+            self._wait(0.5, 110)
 
         if self.state == 110:
             self.lift('up')
@@ -592,7 +592,6 @@ class Rescue(LifecycleNode):
 
         elif self.state == 121:
             if self.target_type == 'silver':
-                self.grab('open')
             self.state = 13
 
         # count victim and return to search
