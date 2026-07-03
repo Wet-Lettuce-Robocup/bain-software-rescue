@@ -151,7 +151,7 @@ class Rescue(LifecycleNode):
     black_line_seen = False
     search_step = 0
     rad_to_turn = 90
-    m_to_dist = 530
+    m_to_dist = 510
 
     def __init__(self):
         super().__init__('rescue_node')
@@ -398,13 +398,13 @@ class Rescue(LifecycleNode):
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
                 if self.search_step == 0: # turn right
-                    self.move.drive(0, 210, 100)
+                    self.move.drive(0, 170, 100)
                 elif self.search_step == 1: # straight
-                    self.move.drive(0, 210, 100)
+                    self.move.drive(0, 170, 100)
                 elif self.search_step == 2: # left 
-                    self.move.drive(0, 210, 100)
+                    self.move.drive(0, 170, 100)
                 elif self.search_step == 3: # back  
-                    self.move.drive(0, 210, 100)
+                    self.move.drive(0, 170, 100)
                 self.turns += 1
                 self._wait(5, 3)
 
@@ -446,7 +446,7 @@ class Rescue(LifecycleNode):
                 bearing = self.target_detection['bearing']
                 self.move.drive(0, bearing * self.rad_to_turn, 100)
                 self.get_logger().info(f'Aligning to target bearing: {bearing*self.rad_to_turn} rad*mult')
-                self._wait(4, 61)
+                self._wait(3, 61)
 
         elif self.state == 61:
             if not getattr(self.move, 'busy', False):
@@ -464,7 +464,7 @@ class Rescue(LifecycleNode):
                         bearing = target['bearing']
                         self.move.drive(0, bearing * self.rad_to_turn, 100)
                         self.get_logger().info(f'Second alignment to target bearing: {bearing*self.rad_to_turn:.3f} rad')
-                        self._wait(3, 7)
+                        self._wait(2, 7)
                     else:
                         # lost the target after first alignment rotate and search again
                         self.get_logger().warn(f'Lost "{self.current_target}" during re-detection, returning to search...')
@@ -534,6 +534,9 @@ class Rescue(LifecycleNode):
         # wait until close, then lower/open claw
         elif self.state == 9:
             self.lift('down')
+            self.wait(0.5, 911)
+
+        elif self.state == 911:
             self.grab('open')
             self._wait(1, 91)
 
