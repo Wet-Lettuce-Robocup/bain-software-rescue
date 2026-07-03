@@ -595,6 +595,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 121:
             if self.target_type == 'silver':
+                self.grab('open')
                 self.state = 13
 
         # count victim and return to search
