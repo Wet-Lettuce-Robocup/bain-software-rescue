@@ -215,6 +215,7 @@ class Rescue(LifecycleNode):
         if self.control_timer is not None:
             try:
                 self.destroy_timer(self.control_timer)
+                self.target_brightness.publish(Int32(data=0))
             except Exception:
                 pass
             self.control_timer = None
@@ -433,7 +434,7 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 if self._detections_ready():
                     target = self._find_target(self.current_target)
-                    self.target_brightnesss.publish(Int32(data=0))
+                    self.target_brightness.publish(Int32(data=0))
                     if target is not None:
                         self.get_logger().info(f'"{self.current_target}" detected after "{self.turns}" turns, aligning...')
                         self.target_type = self.current_target
