@@ -11,7 +11,7 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 class DownVisionNode(Node):
     vision_enabled = False
     black_line_size = 40000
-    silver_line_size = 10000
+    silver_line_size = 7000
     red_line_size = 200000
 
     lower_redline = np.array([0, 100, 100])
