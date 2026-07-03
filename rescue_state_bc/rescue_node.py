@@ -548,11 +548,11 @@ class Rescue(LifecycleNode):
 
         # wait until close, then lower/open claw
         elif self.state == 9:
-            self.lift('down')
-            self._wait(0.5, 911)
+            self.grab('open')
+            self._wait(2, 911)
 
         elif self.state == 911:
-            self.grab('open')
+            self.lift('down')
             self._wait(1, 91)
 
         elif self.state == 91:
@@ -582,8 +582,8 @@ class Rescue(LifecycleNode):
         elif self.state == 11:
             if not getattr(self.move, 'busy', False):
                 self.grab('close')
-                self.move.drive(-60, 0, 100)  # pull victim back
-                self._wait(4, 12)
+                self.move.drive(-100, 0, 100)  # pull victim back
+                self._wait(10, 12)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
