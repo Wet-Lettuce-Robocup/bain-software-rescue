@@ -549,7 +549,7 @@ class Rescue(LifecycleNode):
         # wait until close, then lower/open claw
         elif self.state == 9:
             self.lift('down')
-            self.wait(0.5, 911)
+            self._wait(0.5, 911)
 
         elif self.state == 911:
             self.grab('open')
