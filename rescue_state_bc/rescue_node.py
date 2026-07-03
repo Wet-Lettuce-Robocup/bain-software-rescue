@@ -186,6 +186,7 @@ class Rescue(LifecycleNode):
         self.lift_pub = self.create_publisher(Float32, '/servo/lift', 10) # up is 2.5, down is 0.2
         self.gate_pub = self.create_publisher(Float32, '/servo/gate', 10) # open is 2.3, closed is 0.8
         self.rescue_active_pub = self.create_publisher(Bool, '/rescue_active', 10)
+        self.target_brightness = self.create_publisher(Int32, '/front_led/target_brightness', 10)
 
         self.front_tof_distance = 999999
         self.claw_tof_distance = 999999
@@ -387,6 +388,9 @@ class Rescue(LifecycleNode):
             self.move.drive(140, 0, 100)
             self.get_logger().info('state 2 rescue')
             self.grab('close')
+            self._wait(0.5, 11)
+
+        if self.state == 11:
             self.lift('up')
             self.turns = 0
             self.state = 2
@@ -394,6 +398,9 @@ class Rescue(LifecycleNode):
         # wait for drive in to finish then rotate right
         elif self.state == 2:
             self.lift('up')
+            self._wait(0.5, 21)
+        
+        elif self.state == 21:
             self.grab('close')
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
@@ -406,7 +413,13 @@ class Rescue(LifecycleNode):
                 elif self.search_step == 3: # back  
                     self.move.drive(0, 170, 100)
                 self.turns += 1
-                self._wait(5, 3)
+                self._wait(3, 22)
+
+        elif self.state == 22:
+            if not getattr(self.move, 'busy', False):
+                # turn on brihgntess
+                self.target_brightness.publish(Int32(data=34))
+                self._wait(2, 3)
 
       # search for the current target
         elif self.state == 3:
@@ -420,6 +433,7 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 if self._detections_ready():
                     target = self._find_target(self.current_target)
+                    self.target_brightnesss.publish(Int32(data=0))
                     if target is not None:
                         self.get_logger().info(f'"{self.current_target}" detected after "{self.turns}" turns, aligning...')
                         self.target_type = self.current_target
