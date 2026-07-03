@@ -491,8 +491,8 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.get_logger().info(f'Arrived at target, distance to target: {self.claw_tof_distance:.3f} m')
                 self._request_detections()
+                self._detection_future = None   # discard — result unused before state 9
                 self.state = 8
-
         elif self.state == 72:
             if not getattr(self.move, 'busy', False):
                 if self._detections_ready():
