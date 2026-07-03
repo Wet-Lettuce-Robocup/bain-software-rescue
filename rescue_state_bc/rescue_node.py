@@ -592,7 +592,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 121:
             if self.target_type == 'silver':
-            self.state = 13
+                self.state = 13
 
         # count victim and return to search
         elif self.state == 13:
@@ -631,7 +631,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 16:
             if not getattr(self.move, 'busy', False):
-                self.move.drive(-100, 0, 100)  # back up from tray
+                self.move.drive(-60, 0, 100)  # back up from tray
                 self.state = 17
 
         elif self.state == 17:
