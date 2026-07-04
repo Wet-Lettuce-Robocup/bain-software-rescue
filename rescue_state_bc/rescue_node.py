@@ -586,8 +586,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 120:
             if not getattr(self.move, 'busy', False):
-                if self.front_tof_distance > 0.3:
-                    self._wait(1, 2)
+                self._wait(1, 2)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
@@ -595,80 +594,14 @@ class Rescue(LifecycleNode):
                 self._wait(4, 121)
 
         elif self.state == 121:
-            if self.target_type == 'silver':
-                self.grab('open')
-                self.state = 13
+            # if self.target_type == 'silver':
+            #     self.grab('open')
+            self.state = 13
 
         # count victim and return to search
         elif self.state == 13:
             if not getattr(self.move, 'busy', False):
-
-                if self.target_type == 'silver': #and cond.isrpesed
-                    self.silver_victims_collected += 1
-                else:
-                    self.black_victims_collected += 1
-                self.target_type = None
-                self.target_detection = None
-
-                if self.silver_victims_collected >= 1:
-                    self.get_logger().info('All victims collected')
-                    self.state = 1000
-                else:
-                    self.state = 2
-
-        # find trays
-        elif self.state == 14:
-            self.target_type = 'green'
-            self.state = 2
-
-        elif self.state == 15:
-            if self.target_type == 'green':
-                self.publish_cmd_vel(50, 0)
-                self.publish_cmd_vel(0, 0)
-                self.lift('up')
-                self.state = 16
-            elif self.target_type == 'red':
-                self.publish_cmd_vel(50, 0)
-                self.grab('open')
-                self.publish_cmd_vel(0, 0)
-                self.lift('up')
-                self.state = 16
-
-        elif self.state == 16:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(-60, 0, 100)  # back up from tray
-                self.state = 17
-
-        elif self.state == 17:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(0, 400, 100) # 360 such that back faces tray
-                self.state = 18
-
-        elif self.state == 18:
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(-100, 0, 100) # reverse into tray
-                self.state = 19
-
-        elif self.state == 19:
-            if not getattr(self.move, 'busy', False):
-                self.gate('open') # release victims
-                self._wait(3, 20)
-
-        elif self.state == 20: 
-            if not getattr(self.move, 'busy', False):
-                self.move.drive(50, 0, 100) # move away from tray incase it climbs tray
-                self.state = 21
-
-        elif self.state == 21:
-            if not getattr(self.move, 'busy', False):
-                self.gate('close')
-                self.target_type = 'red' # next going to red to drop black victim
-                self._wait(3, 22) # delay: make sure gate is closed
-
-        elif self.state == 22:
-            if not getattr(self.move, 'busy', False):
-                self.grab('open')
-                self._wait(2, 1) # delay: make sure ball can be release from claw before it shuts again in state 1
+                self.state = 1000
 
         elif self.state == 1000:  # all victims collected, go to greenline
             kp = (60 - self.side_tof_distance) * self.exit_kp
