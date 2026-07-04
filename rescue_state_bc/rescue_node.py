@@ -409,7 +409,6 @@ class Rescue(LifecycleNode):
             self._wait(0.5, 21)
         
         elif self.state == 21:
-            self.grab('close')
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
                 self.move.drive(0, 150, 100)
@@ -581,8 +580,8 @@ class Rescue(LifecycleNode):
                 self._wait(1, 123)
 
         elif self.state == 123:
-                self.move.drive(-100, 0, 100)  # pull victim back
-                self._wait(10, 120)
+            self.move.drive(-100, 0, 100)  # pull victim back
+            self._wait(10, 120)
 
         elif self.state == 120:
             if not getattr(self.move, 'busy', False):
