@@ -588,7 +588,7 @@ class Rescue(LifecycleNode):
 
         elif self.state == 120:
             if not getattr(self.move, 'busy', False):
-                self._wait(1, 2)
+                self._wait(1, 12)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
