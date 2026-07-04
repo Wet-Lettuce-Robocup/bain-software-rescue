@@ -480,10 +480,11 @@ class Rescue(LifecycleNode):
                         self.get_logger().info(f'Second alignment to target bearing: {bearing*self.rad_to_turn:.3f} rad')
                         self._wait(2, 7)
                     else:
-                        # lost the target after first alignment rotate and search again
-                        self.get_logger().warn(f'Lost "{self.current_target}" during re-detection, returning to search...')
-                        self.search_step = 0
-                        self.state = 2
+                        # # lost the target after first alignment rotate and search again
+                        # self.get_logger().warn(f'Lost "{self.current_target}" during re-detection, returning to search...')
+                        # self.search_step = 0
+                        # self.state = 2
+                        self._wait(2, 7)
 
         elif self.state == 7:
             if not getattr(self.move, 'busy', False):
