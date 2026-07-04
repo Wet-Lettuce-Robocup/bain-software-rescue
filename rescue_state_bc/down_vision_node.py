@@ -127,8 +127,8 @@ class DownVisionNode(Node):
         image_top = image[0:int(image.shape[0]/2), :]
         image_bottom = image[int(image.shape[0]/2):, :]
         if cv.countNonZero(image_top) < self.black_line_size and cv.countNonZero(image_bottom) > self.white_line_size:
-
-            line.data = True
+            #line.data = True
+            pass
         self.black_line_pub.publish(line)
 
     def detect_red(self, image):
