@@ -173,6 +173,7 @@ class Rescue(LifecycleNode):
         self.claw_tof_subscriber = self.create_subscription(Int32, '/tof/claw', self.claw_tof_callback, 10)
         self.side_tof_subscriber = self.create_subscription(Int32, '/tof/side', self.side_tof_callback, 10)
         self.black_line_subscriber = self.create_subscription(Bool, '/black_present', self.black_line_callback, 10)
+        self.green_line_subscriber = self.create_subscription(Bool, '/look_for_green', self.green_line_callback, 10)
 
         self.ball_client = self.create_client(Inference, '/ml_rescue/detections')
 
@@ -271,6 +272,11 @@ class Rescue(LifecycleNode):
     def black_line_callback(self, msg):
         if msg.data:
             self.black_line_seen = True
+
+    def green_line_callback(self, msg):
+        if msg.data:
+            self.get_logger().info('Green line detected')
+            self.green_line_seen = True
 
     def front_tof_callback(self, msg):
         try:

@@ -143,6 +143,18 @@ class DownVisionNode(Node):
             present.data = False
         self.red_present_pub.publish(present)
 
+    def detect_blue(self, image):
+        image = cv.cvtColor(image, cv.COLOR_BGR2HSV)
+        image = cv.GaussianBlur(image, (5, 5), 0)
+        image = cv.inRange(image, (100, 150, 0), (140, 255, 255))
+        present = Bool()
+        if cv.countNonZero(image) > self.red_line_size:
+            self.get_logger().info('Blue detected')
+            present.data = True
+        else:
+            present.data = False
+        self.red_present_pub.publish(present)
+
 def main(args=None):
     rclpy.init(args=args)
     node = DownVisionNode()
