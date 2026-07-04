@@ -10,9 +10,10 @@ from rclpy.qos import QoSProfile, QoSReliabilityPolicy, QoSHistoryPolicy
 
 class DownVisionNode(Node):
     vision_enabled = False
-    black_line_size = 400000
+    black_line_size = 100000
     silver_line_size = 7000
     red_line_size = 200000
+    white_line_size = 100000
 
     lower_redline = np.array([0, 100, 100])
     upper_redline = np.array([10, 255, 255])
@@ -123,11 +124,11 @@ class DownVisionNode(Node):
         image = cv.inRange(image, (0,0,0), (50,50,50)) # NEED Upadate
         line = Bool()
         self.get_logger().info(f'Black line pixel count: {cv.countNonZero(image)}')
-        if cv.countNonZero(image) > self.black_line_size:
-            # self.get_logger().info('Black line detected')
+        image_top = image[0:int(image.shape[0]/2), :]
+        image_bottom = image[int(image.shape[0]/2):, :]
+        if cv.countNonZero(image_top) < self.black_line_size and cv.countNonZero(image_bottom) > self.white_line_size:
+
             line.data = True
-        else:
-            line.data = False
         self.black_line_pub.publish(line)
 
     def detect_red(self, image):
