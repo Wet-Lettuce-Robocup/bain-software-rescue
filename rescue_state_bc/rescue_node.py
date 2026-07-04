@@ -570,7 +570,7 @@ class Rescue(LifecycleNode):
                 self.publish_cmd_vel(0, 0)
                 self.move.drive(30, 0, 50)
                 self.state = 11
-            elif self.get_clock().now() - self.tof_seen > rclpy.duration.Duration(seconds=1):
+            if self.get_clock().now() - self.tof_seen > rclpy.duration.Duration(seconds=2):
                 # self.get_logger().warn(f'Could not see victim, canceling')
                 # self.publish_cmd_vel(0, 0)
                 # self.move.drive(-100, 0, 50)  # back up a bit
