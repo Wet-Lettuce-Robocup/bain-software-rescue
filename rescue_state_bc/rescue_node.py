@@ -187,6 +187,7 @@ class Rescue(LifecycleNode):
         self.gate_pub = self.create_publisher(Float32, '/servo/gate', 10) # open is 2.3, closed is 0.8
         self.rescue_active_pub = self.create_publisher(Bool, '/rescue_active', 10)
         self.target_brightness = self.create_publisher(Int32, '/front_led/target_brightness', 10)
+        self.look_for_green_pub = self.create_publisher(Bool, '/look_for_green', 10)
 
         self.front_tof_distance = 999999
         self.claw_tof_distance = 999999
@@ -405,15 +406,7 @@ class Rescue(LifecycleNode):
             self.grab('close')
             # only goes back after two silver collected
             if not getattr(self.move, 'busy', False):
-                if self.search_step == 0: # turn right
-                    self.move.drive(0, 170, 100)
-                elif self.search_step == 1: # straight
-                    self.move.drive(0, 170, 100)
-                elif self.search_step == 2: # left 
-                    self.move.drive(0, 170, 100)
-                elif self.search_step == 3: # back  
-                    self.move.drive(0, 170, 100)
-                self.turns += 1
+                self.move.drive(0, 150, 100)
                 self._wait(3, 22)
 
         elif self.state == 22:
@@ -444,14 +437,14 @@ class Rescue(LifecycleNode):
                         self.search_step += 1
                         self.get_logger().info(f'No "{self.current_target}" found, rotating...')
 
-                        if self.silver_victims_collected >= 2:
+                        if self.silver_victims_collected >= 1:
                             max_steps = 4 
                         else:
                             max_steps = 3
                             
                         if self.search_step >= max_steps:
                             self.search_step = 0 # loop back to 0 after reaching end of cycle
-                            self.move.drive(0, 210, 100)
+                            self.move.drive(0, 150, 100)
                         
                         self.state = 2
 
@@ -539,9 +532,6 @@ class Rescue(LifecycleNode):
                 if self.target_type == 'silver' or self.target_type == 'black':
                     self.get_logger().info(f'Victim "{self.target_type}", proceeding with collection')
                     self.state = 9
-                elif self.target_type == 'green' or self.target_type == 'red':
-                    self.get_logger().info(f'Tray "{self.target_type}", approaching for deposit')
-                    self.state = 15
                 else:
                     self.get_logger().error(f'Unknown target type: {self.target_type}, how did we get here??')
                     self.state = 2
@@ -586,7 +576,12 @@ class Rescue(LifecycleNode):
 
         elif self.state == 123:
                 self.move.drive(-100, 0, 100)  # pull victim back
-                self._wait(10, 12)
+                self._wait(10, 120)
+
+        elif self.state == 120:
+            if not getattr(self.move, 'busy', False):
+                if self.front_tof_distance > 0.3:
+                    self._wait(1, 2)
 
         elif self.state == 12:
             if not getattr(self.move, 'busy', False):
@@ -609,9 +604,9 @@ class Rescue(LifecycleNode):
                 self.target_type = None
                 self.target_detection = None
 
-                if self.silver_victims_collected >= 2 and self.black_victims_collected >= 1:
+                if self.silver_victims_collected >= 1:
                     self.get_logger().info('All victims collected')
-                    self.state = 14
+                    self.state = 1000
                 else:
                     self.state = 2
 
@@ -668,6 +663,31 @@ class Rescue(LifecycleNode):
             if not getattr(self.move, 'busy', False):
                 self.grab('open')
                 self._wait(2, 1) # delay: make sure ball can be release from claw before it shuts again in state 1
+
+        elif self.state == 1000:  # all victims collected, go to greenline
+            kp = (60 - self.side_tof_distance) * self.exit_kp
+            self.publish_cmd_vel(200, kp)
+            if self.side_tof_distance > 150:
+                self.publish_cmd_vel(0, 0)
+                self.get_logger().info('found potential exit')
+                self.move.drive(0, -180, 100) # rotate left
+                self.state = 1001
+
+        elif self.state == 1001:
+            if getattr(self.move, 'busy', False) == False:
+                self.green_line_seen = False
+                self.publish_cmd_vel(20, 0) # drive forward
+                if self.green_line_seen:
+                    self.publish_cmd_vel(0, 0)
+                    self.get_logger().info('black line seen, exit confirmed')
+                    self.move.drive(100, 0, 100) # drive out of exit
+                    self.get_logger().info('deactivating rescue node')
+                    self.look_for_green_pub.publish(Bool(data=True))
+                    self.rescue_active_pub.publish(Bool(data=False))
+                else:
+                    self.get_logger().info('no black line, not an exit')
+                    self.look_for_green_pub.publish(Bool(data=False))
+                    self.state = 1001
 
         elif self.state == 100:  # exit
             kp = (60 - self.side_tof_distance) * self.exit_kp
