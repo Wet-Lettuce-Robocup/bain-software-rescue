@@ -122,6 +122,7 @@ class DownVisionNode(Node):
     def detect_black(self, image):
         image = cv.inRange(image, (0,0,0), (50,50,50)) # NEED Upadate
         line = Bool()
+        self.get_logger().info(f'Black line pixel count: {cv.countNonZero(image)}')
         if cv.countNonZero(image) > self.black_line_size:
             # self.get_logger().info('Black line detected')
             line.data = True
